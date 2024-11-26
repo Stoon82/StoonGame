@@ -1,9 +1,9 @@
-import { TriangleGrid } from './TriangleGrid.js';
+import TriangleMapSystem from './TriangleMapSystem.js';
 
 export class WorldGenerator {
     constructor(seed = Date.now()) {
         this.seed = seed;
-        this.grid = new TriangleGrid();
+        this.mapSystem = new TriangleMapSystem();
     }
 
     // Simple random function with seed
@@ -14,80 +14,55 @@ export class WorldGenerator {
 
     // Generate a new world with given dimensions
     generateWorld(width, height) {
-        // Clear existing grid
-        this.grid = new TriangleGrid();
+        // Clear existing map
+        this.mapSystem.clear();
         
         // For single triangle test, just create one at origin
         if (width === 1 && height === 1) {
-            this.grid.setTriangle(0, 0, {
-                terrain: this.generateTerrainType(0, 0),
-                elevation: this.generateElevation(0, 0),
-                resources: this.generateResources('grass'),
-                arcColors: [
-                    '#' + Math.floor(this.random()*16777215).toString(16).padStart(6, '0'),
-                    '#' + Math.floor(this.random()*16777215).toString(16).padStart(6, '0'),
-                    '#' + Math.floor(this.random()*16777215).toString(16).padStart(6, '0')
-                ]
-            });
-            return this.grid;
+            const groundTypes = [
+                this.generateTerrainType(0, 0), // center
+                this.generateTerrainType(0, 0), // left
+                this.generateTerrainType(0, 0), // right
+                this.generateTerrainType(0, 0)  // top/bottom
+            ];
+            this.mapSystem.addTriangle(0, 0, groundTypes);
+            return this.mapSystem;
         }
 
         // For larger grids, generate triangles in the specified range
         for (let q = 0; q < width; q++) {
             for (let r = 0; r < height; r++) {
-                const terrainType = this.generateTerrainType(q, r);
-                this.grid.setTriangle(q, r, {
-                    terrain: terrainType,
-                    elevation: this.generateElevation(q, r),
-                    resources: this.generateResources(terrainType),
-                    arcColors: [
-                        '#' + Math.floor(this.random()*16777215).toString(16).padStart(6, '0'),
-                        '#' + Math.floor(this.random()*16777215).toString(16).padStart(6, '0'),
-                        '#' + Math.floor(this.random()*16777215).toString(16).padStart(6, '0')
-                    ]
-                });
+                // Generate ground types for this triangle
+                const groundTypes = [
+                    this.generateTerrainType(q, r),     // center
+                    this.generateTerrainType(q-1, r),   // left
+                    this.generateTerrainType(q+1, r),   // right
+                    (q + r) % 2 === 0 ?                 // top/bottom based on orientation
+                        this.generateTerrainType(q, r+1) :  // upward triangle -> bottom
+                        this.generateTerrainType(q, r-1)    // downward triangle -> top
+                ];
+
+                // Try to add the triangle
+                this.mapSystem.addTriangle(q, r, groundTypes);
             }
         }
 
-        return this.grid;
+        return this.mapSystem;
     }
 
-    // Generate terrain type for a triangle
+    // Generate terrain type for a position
     generateTerrainType(q, r) {
         const value = this.noise(q * 0.1, r * 0.1);
         
-        if (value < 0.2) return 'water';
-        if (value < 0.4) return 'sand';
-        if (value < 0.7) return 'grass';
-        if (value < 0.85) return 'forest';
-        return 'mountain';
+        if (value < 0.2) return 'WATER';
+        if (value < 0.4) return 'SAND';
+        if (value < 0.7) return 'GRASS';
+        return 'ROCK';
     }
 
-    // Generate elevation for a triangle
+    // Generate elevation for a position
     generateElevation(q, r) {
         return this.noise(q * 0.2 + 1000, r * 0.2 + 1000) * 100;
-    }
-
-    // Generate resources based on terrain type
-    generateResources(terrainType) {
-        const resources = [];
-        const chance = this.random();
-
-        switch (terrainType) {
-            case 'water':
-                if (chance < 0.1) resources.push('fish');
-                break;
-            case 'forest':
-                if (chance < 0.3) resources.push('wood');
-                if (chance < 0.1) resources.push('berries');
-                break;
-            case 'mountain':
-                if (chance < 0.2) resources.push('stone');
-                if (chance < 0.05) resources.push('ore');
-                break;
-        }
-
-        return resources;
     }
 
     // Simple noise function
@@ -99,19 +74,8 @@ export class WorldGenerator {
         y = y - Y;
         
         const hash = (X * 73856093) ^ (Y * 19349663);
-        let value = Math.sin(hash) * 43758.5453123;
-        value = value - Math.floor(value);
-        
-        // Smooth the value
-        const u = this.fade(x);
-        const v = this.fade(y);
-        
-        return value * u * v;
-    }
-
-    // Smoothing function for noise
-    fade(t) {
-        return t * t * (3 - 2 * t);
+        this.seed = hash;
+        return this.random();
     }
 }
 

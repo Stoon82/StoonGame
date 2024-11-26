@@ -1,8 +1,11 @@
 import WorldRenderer from './worldRenderer.js';
-import TriangleGrid from '@shared/world/TriangleGrid.js';
+import TriangleMapSystem from '@shared/world/TriangleMapSystem.js';
 import { StoonieManager } from '@shared/entities/StoonieManager.js';
 
 console.log('Initializing game...');
+
+// Global debug flag
+window.DEBUG_MODE = false;
 
 class Game {
     constructor() {
@@ -18,17 +21,47 @@ class Game {
         }
 
         // Initialize managers
-        this.grid = new TriangleGrid();
-        this.renderer = new WorldRenderer(this.canvas);
-        this.previewRenderer = new WorldRenderer(this.previewCanvas, true);
-        this.stoonieManager = new StoonieManager(this.grid);
+        this.mapSystem = new TriangleMapSystem();
+        this.renderer = new WorldRenderer(this.canvas, false, this.mapSystem);
+        this.previewRenderer = new WorldRenderer(this.previewCanvas, true, this.mapSystem);
+        this.stoonieManager = new StoonieManager(this.mapSystem);
 
         // Initialize UI state
-        this.currentPreviewGroundTypes = null;
+        this.currentPreviewGroundTypes = this.generateRandomGroundTypes(); // [center, right, left, top/bottom]
 
         this.setupEventListeners();
         this.generateNewWorld();
         this.animate();
+
+        // Debug mode toggle with Shift key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Shift') {
+                window.DEBUG_MODE = true;
+                console.log('[Debug] Debug mode enabled');
+            } else if (e.key === ' ') { // Space key
+                this.currentPreviewGroundTypes = this.generateRandomGroundTypes();
+                console.log('[Game] Rerolled preview ground types:', this.currentPreviewGroundTypes);
+                
+                // Update both preview canvases
+                this.previewRenderer.clear();
+                this.previewRenderer.renderTriangle(0, 0, this.currentPreviewGroundTypes);
+                
+                // Update the hover preview if it exists
+                const mousePos = this.renderer.getLastMousePosition();
+                if (mousePos) {
+                    this.handleMouseMove(mousePos.x, mousePos.y);
+                }
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'Shift') {
+                window.DEBUG_MODE = false;
+                console.log('[Debug] Debug mode disabled');
+                // Clear any existing debug markers
+                this.renderer.removePreviewMesh();
+            }
+        });
     }
 
     setupEventListeners() {
@@ -41,28 +74,15 @@ class Game {
         // Mouse interaction
         this.canvas.addEventListener('mousemove', (event) => {
             const rect = this.canvas.getBoundingClientRect();
-            this.handleMouseMove(event.clientX - rect.left, event.clientY - rect.top);
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            this.renderer.handleMouseMove(x, y);
+            this.handleMouseMove(x, y);
         });
 
         this.canvas.addEventListener('click', (event) => {
             const rect = this.canvas.getBoundingClientRect();
             this.handleCanvasClick(event.clientX - rect.left, event.clientY - rect.top);
-        });
-
-        // Setup click handler for placing triangles
-        this.canvas.addEventListener('click', (event) => {
-            const rect = this.canvas.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
-            this.handleCanvasClick(x, y);
-        });
-
-        // Setup mousemove handler for preview
-        this.canvas.addEventListener('mousemove', (event) => {
-            const rect = this.canvas.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
-            this.handleMouseMove(x, y);
         });
 
         // Remove preview when mouse leaves canvas
@@ -72,9 +92,9 @@ class Game {
     }
 
     generateNewWorld() {
-        console.log('Generating new world...');
+        console.log('[Game] Generating new world...');
         this.renderer.clear();
-        this.grid.clear();
+        this.mapSystem.clear();
 
         // Create initial hexagon with 6 triangles
         const initialTriangles = [
@@ -86,11 +106,19 @@ class Game {
             { q: 1, r: 0 }       // Bottom-Right
         ];
 
+        console.log('[Game] Adding initial triangles...');
         initialTriangles.forEach(pos => {
             const groundTypes = this.generateRandomGroundTypes();
-            this.renderer.renderTriangle(pos.q, pos.r, groundTypes);
-            this.grid.addTriangle(pos.q, pos.r, { groundTypes });
+            const success = this.mapSystem.addTriangle(pos.q, pos.r, groundTypes);
+            console.log(`[Game] Added triangle at (${pos.q}, ${pos.r}): ${success ? '✅' : '❌'}`);
+            if (success) {
+                this.renderer.renderTriangle(pos.q, pos.r, groundTypes);
+            }
         });
+
+        // Log final state
+        console.log('[Game] Initial world generation complete');
+        this.mapSystem.logMapState();
 
         // Generate new preview triangle
         this.generateNewPreviewTriangle();
@@ -99,143 +127,82 @@ class Game {
     generateRandomGroundTypes() {
         const types = ['GRASS', 'WATER', 'SAND', 'ROCK'];
         return [
-            types[Math.floor(Math.random() * types.length)], // Center
-            types[Math.floor(Math.random() * types.length)], // Left arc
-            types[Math.floor(Math.random() * types.length)], // Right arc
-            types[Math.floor(Math.random() * types.length)]  // Top/Bottom arc
+            types[Math.floor(Math.random() * types.length)], // center
+            types[Math.floor(Math.random() * types.length)], // right
+            types[Math.floor(Math.random() * types.length)], // left
+            types[Math.floor(Math.random() * types.length)]  // top/bottom
         ];
     }
 
-    generateNewPreviewTriangle() {
-        const groundTypes = this.generateRandomGroundTypes();
+    handleMouseMove(x, y) {
+        const gridPos = this.renderer.getPreviewGridPosition(x, y);
+        if (!gridPos) {
+            this.renderer.removePreviewMesh();
+            return;
+        }
 
-        // Clear previous preview
-        this.previewRenderer.clear();
+        // Update cursor debug info
+        const debugElement = document.getElementById('cursorDebug');
+        if (debugElement) {
+            const cornerPositions = this.mapSystem.calculateCornerPositions(gridPos.q, gridPos.r);
+            const isUpward = (gridPos.q + gridPos.r) % 2 === 0;
+            
+            let debugText = `Grid Pos: (${gridPos.q}, ${gridPos.r})\n`;
+            debugText += `Is Upward: ${isUpward}\n`;
+            debugText += `Ground Types: [${this.currentPreviewGroundTypes.join(', ')}]\n\n`;
+            
+            cornerPositions.forEach((pos, i) => {
+                const key = this.mapSystem.worldToKey(pos.x, pos.z);
+                const groundTypeIndex = this.mapSystem.getCornerGroundTypeIndex(i, isUpward);
+                debugText += `Corner ${i}:\n`;
+                debugText += `  World Pos: (${pos.x.toFixed(2)}, ${pos.z.toFixed(2)})\n`;
+                debugText += `  Key: ${key}\n`;
+                debugText += `  Ground Type Index: ${groundTypeIndex}\n`;
+                debugText += `  Ground Type: ${this.currentPreviewGroundTypes[groundTypeIndex]}\n`;
+                
+                const existing = this.mapSystem.cornerPoints.get(key);
+                if (existing) {
+                    debugText += `  Existing Types: [${existing.groundTypes.join(', ')}]\n`;
+                } else {
+                    debugText += `  No existing point\n`;
+                }
+                debugText += '\n';
+            });
+            
+            debugElement.textContent = debugText;
+        }
 
-        // Render preview triangle at center of preview canvas
-        this.previewRenderer.renderTriangle(0, 0, groundTypes);
-
-        // Store current preview ground types
-        this.currentPreviewGroundTypes = groundTypes;
-    }
-
-    isPositionInRange(q, r) {
-        const gridRange = 1; // Only check immediate neighbors
-        const nearbyTriangles = this.grid.getTrianglesInRange(q, r, gridRange);
-        return nearbyTriangles.length > 0;
+        // Update preview mesh
+        this.renderer.showPreviewTriangle(gridPos.q, gridPos.r, this.currentPreviewGroundTypes);
     }
 
     handleCanvasClick(x, y) {
         const gridPos = this.renderer.getGridPosition(x, y);
         if (!gridPos) return;
 
-        // Check if the position already has a triangle
-        if (this.grid.hasTriangle(gridPos.q, gridPos.r)) {
-            console.log(`Position ${gridPos.q},${gridPos.r} already occupied`);
-            return;
-        }
+        console.log('\n[Game] Attempting to add triangle at:', gridPos);
+        console.log('Current Map State BEFORE adding:');
+        this.mapSystem.logMapState();
 
-        // Check if we're close enough to an existing triangle
-        if (!this.isPositionInRange(gridPos.q, gridPos.r)) {
-            console.log(`Position ${gridPos.q},${gridPos.r} not in range of existing triangles`);
-            return;
-        }
-
-        console.log(`Placing triangle at ${gridPos.q},${gridPos.r}`);
-
-        // Place the triangle
-        this.renderer.renderTriangle(gridPos.q, gridPos.r, this.currentPreviewGroundTypes);
-        this.grid.addTriangle(gridPos.q, gridPos.r, { groundTypes: this.currentPreviewGroundTypes });
-
-        // Generate new preview triangle
-        this.generateNewPreviewTriangle();
-    }
-
-    handleMouseMove(x, y) {
-        const gridPos = this.renderer.getGridPosition(x, y);
-        if (!gridPos) {
-            this.renderer.removePreviewMesh();
-            return;
-        }
-
-        // Check if position is valid for placement
-        if (this.grid.hasTriangle(gridPos.q, gridPos.r)) {
-            this.renderer.removePreviewMesh();
-            return;
-        }
-
-        // Show preview if we're close enough to an existing triangle
-        if (this.isPositionInRange(gridPos.q, gridPos.r)) {
-            this.renderer.createPreviewMesh(gridPos.q, gridPos.r, this.currentPreviewGroundTypes);
+        // Try to add the triangle
+        if (this.mapSystem.addTriangle(gridPos.q, gridPos.r, this.currentPreviewGroundTypes)) {
+            console.log('\n[Game] Successfully added triangle. New Map State:');
+            this.mapSystem.logMapState();
+            this.renderer.renderTriangle(gridPos.q, gridPos.r, this.currentPreviewGroundTypes);
+            this.generateNewPreviewTriangle();
         } else {
-            this.renderer.removePreviewMesh();
+            console.log('\n[Game] Failed to add triangle at:', gridPos);
         }
     }
 
-    addRandomStoonie() {
-        // Get all placed triangles
-        const placedTriangles = Array.from(this.grid.triangles.values());
-        if (placedTriangles.length === 0) {
-            console.log('No triangles placed yet!');
-            return;
-        }
-
-        // Pick a random triangle
-        const randomTriangle = placedTriangles[Math.floor(Math.random() * placedTriangles.length)];
-        console.log('Selected triangle:', randomTriangle);
-
-        // Create a new Stoonie at this position
-        const stoonie = this.stoonieManager.createStoonie(randomTriangle.q, randomTriangle.r);
-        console.log('Created Stoonie:', stoonie);
-
-        // Add the Stoonie to the renderer
-        this.renderer.renderStoonie(stoonie);
-    }
-
-    updateStoonieStats() {
-        if (!this.stooniesList) return;
-        
-        const stoonies = this.stoonieManager.getStoonies();
-        this.stooniesList.innerHTML = '';
-        
-        for (const stoonie of stoonies) {
-            const status = stoonie.getStatus();
-            const div = document.createElement('div');
-            div.className = `stoonie-stats ${status.gender}`;
-            
-            div.innerHTML = `
-                <div>ID: ${status.id.slice(0, 6)}... (${status.gender})</div>
-                <div>Age: ${status.age.toFixed(1)} days</div>
-                <div>Position: (${status.position.q}, ${status.position.r})</div>
-                ${Object.entries(status.needs).map(([need, value]) => `
-                    <div>${need}: ${value.toFixed(1)}
-                        <div class="needs-bar">
-                            <div class="needs-bar-fill" style="width: ${value}%"></div>
-                        </div>
-                    </div>
-                `).join('')}
-            `;
-            
-            this.stooniesList.appendChild(div);
-        }
+    generateNewPreviewTriangle() {
+        this.currentPreviewGroundTypes = this.generateRandomGroundTypes();
+        this.previewRenderer.clear();
+        this.previewRenderer.renderTriangle(0, 0, this.currentPreviewGroundTypes);
     }
 
     animate() {
         requestAnimationFrame(() => this.animate());
-
-        // Update Stoonies
-        this.stoonieManager.update();
-        
-        // Update Stoonie positions in renderer
-        const stoonies = this.stoonieManager.getStoonies();
-        for (const stoonie of stoonies) {
-            this.renderer.updateStoonie(stoonie);
-        }
-
-        // Update stats panel
-        this.updateStoonieStats();
-
-        // Render the scene
         this.renderer.render();
         this.previewRenderer.render();
     }
@@ -245,8 +212,7 @@ class Game {
 document.addEventListener('DOMContentLoaded', () => {
     try {
         window.game = new Game();
-        console.log('Game initialized successfully');
     } catch (error) {
-        console.error('Error initializing game:', error);
+        console.error('Failed to initialize game:', error);
     }
 });

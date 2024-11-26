@@ -115,6 +115,23 @@
             border-radius: 2px;
             transition: width 0.3s ease;
         }
+        #debugOverlay {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+        #debugOverlay pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
@@ -132,6 +149,17 @@
     <div id="statsPanel">
         <h3>Stoonies</h3>
         <div id="stooniesList"></div>
+    </div>
+    <div id="debugOverlay">
+        <h4 style="margin: 0 0 10px 0;">Debug Info</h4>
+        <div style="margin-bottom: 10px;">
+            <strong>Cursor Triangle:</strong>
+            <pre id="cursorDebug"></pre>
+        </div>
+        <div>
+            <strong>Corner Points:</strong>
+            <pre id="cornerPointsDebug"></pre>
+        </div>
     </div>
     <script type="module" src="/dist/bundle.js"></script>
 </body>

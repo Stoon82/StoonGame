@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import GridTriangleRenderer from './gridTriangleRenderer.js';
 
 class WorldRenderer {
-    constructor(canvas, isPreview = false) {
+    constructor(canvas, isPreview = false, mapSystem = null) {
         this.canvas = canvas;
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(75, canvas.width / canvas.height, 0.1, 1000);
@@ -14,6 +14,14 @@ class WorldRenderer {
         this.isPreview = isPreview;
         this.previewMesh = null;
         this.stoonieMeshes = new Map(); // Store Stoonie meshes by ID
+        this.size = 1;
+        this.lastMousePosition = null;
+        this.mapSystem = mapSystem;
+        
+        // Initialize debug markers group
+        this.debugMarkers = new THREE.Group();
+        this.scene.add(this.debugMarkers);
+        this.debugMarkersTimeout = null;
         
         this.setupScene();
         if (!isPreview) {
@@ -69,6 +77,7 @@ class WorldRenderer {
     setupEventListeners() {
         if (!this.isPreview) {
             window.addEventListener('resize', () => this.onWindowResize(), false);
+            this.canvas.addEventListener('mousemove', (event) => this.handleMouseMove(event.clientX, event.clientY), false);
         }
     }
 
@@ -123,25 +132,112 @@ class WorldRenderer {
         return null;
     }
 
-    createPreviewMesh(q, r, groundTypes) {
-        // Remove existing preview if any
+    getPreviewGridPosition(x, y) {
+        return this.getGridPosition(x, y);
+    }
+
+    // Create semi-transparent preview mesh with optional red border for invalid placement
+    createPreviewMesh(q, r, groundTypes, isInvalid = false, validationResults = null) {
+        console.log('[WorldRenderer] Creating preview mesh with debug mode:', window.DEBUG_MODE);
+        
+        // Remove existing preview mesh but keep debug markers
         if (this.previewMesh) {
             this.scene.remove(this.previewMesh);
+            this.previewMesh = null;
         }
 
         // Create semi-transparent preview mesh
         const mesh = this.gridRenderer.createTriangleMesh(q, r, 1, this.isUpwardTriangle(q, r), groundTypes);
+        
         mesh.traverse(child => {
             if (child instanceof THREE.Mesh) {
                 const material = child.material.clone();
                 material.transparent = true;
                 material.opacity = 0.5;
+
+                if (isInvalid) {
+                    material.emissive = new THREE.Color(0xff0000);
+                    material.emissiveIntensity = 0.8;
+                    material.emissiveMap = null;
+                }
+
                 child.material = material;
             }
         });
 
         this.previewMesh = mesh;
         this.scene.add(mesh);
+
+        // Add or update debug markers if debug mode is enabled
+        if (window.DEBUG_MODE) {
+            console.log('[WorldRenderer] Debug mode active, adding markers');
+            
+            // Clear existing markers
+            this.clearDebugMarkers();
+
+            // Add test marker at preview mesh position
+            const centerMarker = new THREE.Mesh(
+                new THREE.BoxGeometry(0.5, 2, 0.5),
+                new THREE.MeshBasicMaterial({ color: 0xffff00 })
+            );
+            // Use mesh position for center marker
+            if (mesh.position) {
+                centerMarker.position.copy(mesh.position);
+                centerMarker.position.y = 1; // Set height to 1
+                this.debugMarkers.add(centerMarker);
+                console.log(`[WorldRenderer] Added center marker at`, centerMarker.position);
+            }
+            
+            if (validationResults && validationResults.corners) {
+                console.log('[WorldRenderer] Adding corner markers:', validationResults.corners);
+                
+                validationResults.corners.forEach((corner, index) => {
+                    // Create marker box (using box instead of sphere for better visibility)
+                    const markerGeometry = new THREE.BoxGeometry(0.4, 2, 0.4);
+                    const markerMaterial = new THREE.MeshBasicMaterial({
+                        color: corner.valid ? 0x00ff00 : 0xff0000,
+                        transparent: false // Make fully opaque
+                    });
+                    const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+                    marker.position.set(corner.x, 1, corner.z);
+                    this.debugMarkers.add(marker);
+                    console.log(`[WorldRenderer] Added corner marker ${index} at (${corner.x}, 1, ${corner.z})`);
+
+                    // Create text label
+                    if (corner.existing) {
+                        const text = `Corner ${index}\nCurrent: ${corner.existing.join(',')}\nNew: ${corner.groundType}`;
+                        const sprite = this.createTextSprite(text, corner.valid ? '#00ff00' : '#ff0000');
+                        sprite.position.set(corner.x, 2.5, corner.z);
+                        this.debugMarkers.add(sprite);
+                    }
+                });
+            }
+
+            // Clear any existing timeout
+            if (this.debugMarkersTimeout) {
+                clearTimeout(this.debugMarkersTimeout);
+            }
+
+            // Set timeout to clear markers after 10 seconds
+            this.debugMarkersTimeout = setTimeout(() => {
+                console.log('[WorldRenderer] Clearing debug markers after timeout');
+                this.clearDebugMarkers();
+            }, 10000);
+        }
+    }
+
+    clearDebugMarkers() {
+        console.log('[WorldRenderer] Clearing debug markers, count:', this.debugMarkers.children.length);
+        while(this.debugMarkers.children.length > 0) {
+            const child = this.debugMarkers.children[0];
+            if (child.material) {
+                child.material.dispose();
+            }
+            if (child.geometry) {
+                child.geometry.dispose();
+            }
+            this.debugMarkers.remove(child);
+        }
     }
 
     removePreviewMesh() {
@@ -149,6 +245,53 @@ class WorldRenderer {
             this.scene.remove(this.previewMesh);
             this.previewMesh = null;
         }
+    }
+
+    // Helper method to create text sprites for debug info
+    createTextSprite(message, color = '#ffffff') {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        
+        // Set up canvas
+        const fontSize = 24;
+        context.font = `${fontSize}px Arial`;
+        
+        // Calculate text dimensions
+        const lines = message.split('\n');
+        const lineHeight = fontSize * 1.2;
+        const width = Math.max(...lines.map(line => context.measureText(line).width)) + 20;
+        const height = lineHeight * lines.length + 20;
+        
+        // Resize canvas
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Draw background
+        context.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        context.fillRect(0, 0, width, height);
+        
+        // Draw text
+        context.font = `${fontSize}px Arial`;
+        context.fillStyle = color;
+        context.textAlign = 'left';
+        context.textBaseline = 'top';
+        lines.forEach((line, i) => {
+            context.fillText(line, 10, 10 + i * lineHeight);
+        });
+        
+        // Create sprite
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({ 
+            map: texture,
+            transparent: true,
+            depthTest: false
+        });
+        
+        const sprite = new THREE.Sprite(spriteMaterial);
+        const scale = 0.01;
+        sprite.scale.set(width * scale, height * scale, 1);
+        
+        return sprite;
     }
 
     renderStoonie(stoonie) {
@@ -192,6 +335,27 @@ class WorldRenderer {
         const x = q * size;
         const z = r * h;
         return { x, z };
+    }
+
+    getLastMousePosition() {
+        return this.lastMousePosition;
+    }
+
+    handleMouseMove(x, y) {
+        this.lastMousePosition = { x, y };
+    }
+
+    showPreviewTriangle(q, r, groundTypes) {
+        // Check if position is valid for placement
+        const validationResults = this.mapSystem.canAddTriangle(q, r, groundTypes);
+        
+        this.createPreviewMesh(
+            q, 
+            r, 
+            groundTypes, 
+            !validationResults.valid,
+            validationResults
+        );
     }
 }
 

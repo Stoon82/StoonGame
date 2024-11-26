@@ -112,7 +112,23 @@ class GridTriangleRenderer {
                 geometry.arcLength  // arc length (60 degrees)
             );
             
-            const arcMaterial = this.getMaterial(this.groundTypeColors[groundTypes[index + 1]]);
+            // Map vertex index to ground type index based on orientation
+            let groundTypeIndex;
+            if (isUpward) {
+                switch(index) {
+                    case 0: groundTypeIndex = 1; break; // Bottom-Left -> left
+                    case 1: groundTypeIndex = 2; break; // Bottom-Right -> right
+                    case 2: groundTypeIndex = 3; break; // Top -> top/bottom
+                }
+            } else {
+                switch(index) {
+                    case 0: groundTypeIndex = 2; break; // Top-Left -> right
+                    case 1: groundTypeIndex = 1; break; // Top-Right -> left
+                    case 2: groundTypeIndex = 3; break; // Bottom -> top/bottom
+                }
+            }
+            
+            const arcMaterial = this.getMaterial(this.groundTypeColors[groundTypes[groundTypeIndex]]);
             const arc = new THREE.Mesh(arcGeometry, arcMaterial);
             
             // Position arc with offset to ensure proper connection
