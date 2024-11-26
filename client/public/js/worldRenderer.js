@@ -1,136 +1,167 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { TriangleGrid } from '../../../shared/world/TriangleGrid';
+import { GridTriangleRenderer } from './gridTriangleRenderer';
 
 export class WorldRenderer {
     constructor(container) {
+        console.log('Initializing WorldRenderer');
+        this.container = container;
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        
+        // Set up renderer
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setClearColor(0x87CEEB); // Sky blue background
         container.appendChild(this.renderer.domElement);
-
-        // Add orbit controls
+        
+        // Set up camera and controls
+        this.camera.position.set(0, 10, 10);
+        this.camera.lookAt(0, 0, 0);
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         
-        // Set up camera
-        this.camera.position.z = 5;
-        this.camera.position.y = 3;
-        this.camera.lookAt(0, 0, 0);
-
-        // Add ambient light
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        this.scene.add(ambientLight);
-
-        // Add directional light
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(10, 20, 10);
-        this.scene.add(dirLight);
-
+        // Create lights
+        this.setupLights();
+        
+        // Create ground
+        this.setupGround();
+        
+        // Initialize grid and renderers
+        this.grid = new TriangleGrid(10, 10);
+        this.triangleMeshes = new Map();
+        this.stoonieObjects = new Map();
+        this.gridTriangleRenderer = new GridTriangleRenderer();
+        
+        // Bind animation
+        this.animate = this.animate.bind(this);
+        
         // Start animation loop
         this.animate();
-
+        
         // Handle window resize
-        window.addEventListener('resize', () => {
-            this.camera.aspect = window.innerWidth / window.innerHeight;
-            this.camera.updateProjectionMatrix();
-            this.renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        window.addEventListener('resize', () => this.onWindowResize(), false);
     }
-
-    renderWorld(grid) {
-        // Clear existing triangles
-        this.scene.children = this.scene.children.filter(child => 
-            child instanceof THREE.Light || child instanceof THREE.GridHelper
-        );
-
-        // Create triangles
-        grid.triangles.forEach((triangle, key) => {
-            // Create triangle face
-            const vertices = triangle.vertices;
-            const geometry = new THREE.BufferGeometry();
-            
-            // Convert vertices to Three.js format
-            const points = [];
-            vertices.forEach(v => {
-                points.push(v.x, 0, -v.y);
-            });
-            
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
-
-            // Create material for triangle
-            const material = new THREE.MeshPhongMaterial({ 
-                color: triangle.isUpward ? 0xa0a0a0 : 0x808080,
-                flatShading: true,
-                side: THREE.DoubleSide
-            });
-
-            const triangleMesh = new THREE.Mesh(geometry, material);
-            this.scene.add(triangleMesh);
-
-            // Add circle arcs at vertices
-            triangle.arcCenters.forEach((arc, index) => {
-                let startAngle, endAngle;
+    
+    setupLights() {
+        // Ambient light
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        this.scene.add(ambientLight);
+        
+        // Directional light (sun)
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+        dirLight.position.set(5, 5, 5);
+        this.scene.add(dirLight);
+        
+        // Hemisphere light
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+        hemiLight.position.set(0, 20, 0);
+        this.scene.add(hemiLight);
+    }
+    
+    setupGround() {
+        const groundGeometry = new THREE.PlaneGeometry(50, 50);
+        const groundMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x228B22,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.1;
+        this.scene.add(ground);
+    }
+    
+    generateWorld(width = 10, height = 10) {
+        console.log(`Generating world with dimensions ${width}x${height}...`);
+        // Clear existing meshes
+        this.triangleMeshes.forEach(mesh => {
+            this.scene.remove(mesh);
+        });
+        this.triangleMeshes.clear();
+        
+        // Create new grid with specified dimensions
+        this.grid = new TriangleGrid(width, height);
+        
+        // Create meshes for each triangle with random ground types
+        const groundTypes = ['GRASS', 'WATER', 'SAND', 'ROCK'];
+        
+        for (let q = 0; q < width; q++) {
+            for (let r = 0; r < height; r++) {
+                const isUpward = (q + r) % 2 === 0;
                 
-                if (triangle.isUpward) {
-                    switch(index) {
-                        case 0: // Bottom left
-                            startAngle = 2*Math.PI/6;     // 45°
-                            endAngle = 0*Math.PI/6;       // 105°
-                            break;
-                        case 1: // Bottom right
-                            startAngle = 4*Math.PI/6;     // 90°
-                            endAngle = 6*Math.PI/6;     // 150°
-                            break;
-                        case 2: // Top
-                            startAngle = 8*Math.PI/6;    // -30°
-                            endAngle = 10*Math.PI/6;       // 30°
-                            break;
-                    }
-                } else {
-                    switch(index) {
-                        case 0: // Top left
-                            startAngle = -2*Math.PI/6;  // -150°
-                            endAngle = 0*Math.PI/6;      // -90°
-                            break;
-                        case 1: // Top right
-                            startAngle = 6*Math.PI/6;    // -90°
-                            endAngle = 8*Math.PI/6;      // -30°
-                            break;
-                        case 2: // Bottom
-                            startAngle = 2*Math.PI/6;   // 150°
-                            endAngle = 4*Math.PI/6;     // 210°
-                            break;
-                    }
-                }
-
-                const arcGeometry = new THREE.CircleGeometry(
-                    arc.radius,
-                    32,
-                    startAngle,
-                    endAngle - startAngle
+                // Randomly assign ground types for testing
+                const triangleGroundTypes = [
+                    groundTypes[Math.floor(Math.random() * groundTypes.length)],  // Center
+                    groundTypes[Math.floor(Math.random() * groundTypes.length)],  // Left arc
+                    groundTypes[Math.floor(Math.random() * groundTypes.length)],  // Right arc
+                    groundTypes[Math.floor(Math.random() * groundTypes.length)]   // Top/Bottom arc
+                ];
+                
+                const mesh = this.gridTriangleRenderer.createTriangleMesh(
+                    q, r, this.grid.size, isUpward, triangleGroundTypes
                 );
                 
-                const arcMaterial = new THREE.MeshBasicMaterial({ 
-                    color: triangle.data.arcColors[index],
-                    side: THREE.DoubleSide
-                });
-                
-                const arcMesh = new THREE.Mesh(arcGeometry, arcMaterial);
-                
-                // Position arc at vertex with fixed rotation
-                arcMesh.position.set(arc.x, 0.01, -arc.y);
-                arcMesh.rotation.x = -Math.PI/2;
-                
-                this.scene.add(arcMesh);
-            });
-        });
+                this.scene.add(mesh);
+                this.triangleMeshes.set(this.grid.coordToKey(q, r), mesh);
+            }
+        }
 
-        // Add a grid helper for reference
-        const gridHelper = new THREE.GridHelper(10, 10);
-        this.scene.add(gridHelper);
+        // Adjust camera to view the entire grid
+        const gridExtent = Math.max(width, height);
+        const cameraDistance = gridExtent * 1.5;
+        this.camera.position.set(cameraDistance, cameraDistance, cameraDistance);
+        this.camera.lookAt(width/2, 0, height/2);
+        this.controls.target.set(width/2, 0, height/2);
+        
+        console.log('World generation complete');
     }
+    
+    updateStoonies(stoonies) {
+        // Remove old Stoonie objects
+        for (const [id, object] of this.stoonieObjects) {
+            if (!stoonies.find(s => s.id === id)) {
+                this.scene.remove(object);
+                this.stoonieObjects.delete(id);
+            }
+        }
 
-    animate = () => {
+        // Update or create new Stoonie objects
+        stoonies.forEach(stoonie => {
+            let stoonieObject = this.stoonieObjects.get(stoonie.id);
+            
+            if (!stoonieObject) {
+                // Create new Stoonie representation
+                const geometry = new THREE.SphereGeometry(0.2, 32, 32);
+                const material = new THREE.MeshStandardMaterial({
+                    color: stoonie.gender === 'male' ? 0x3366cc : 0xcc3366
+                });
+                stoonieObject = new THREE.Mesh(geometry, material);
+                this.scene.add(stoonieObject);
+                this.stoonieObjects.set(stoonie.id, stoonieObject);
+            }
+
+            // Update position using grid coordinates
+            const worldPos = this.grid.getWorldPosition(stoonie.position.q, stoonie.position.r);
+            stoonieObject.position.set(worldPos.x, 0.2, worldPos.z); // Slightly above ground
+
+            // Update appearance based on state
+            const material = stoonieObject.material;
+            material.color.setHex(stoonie.gender === 'male' ? 0x3366cc : 0xcc3366);
+            
+            // Scale based on age (baby to adult)
+            const scale = Math.min(1, 0.3 + (stoonie.age / 20) * 0.7);
+            stoonieObject.scale.set(scale, scale, scale);
+        });
+    }
+    
+    onWindowResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    
+    animate() {
         requestAnimationFrame(this.animate);
         this.controls.update();
         this.renderer.render(this.scene, this.camera);

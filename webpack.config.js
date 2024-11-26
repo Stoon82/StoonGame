@@ -5,13 +5,18 @@ module.exports = {
     output: {
         filename: 'bundle.js',
         path: path.resolve(__dirname, 'client/public/dist'),
+        publicPath: '/dist/'
     },
     resolve: {
         fallback: {
             "path": false,
             "fs": false
         },
-        extensions: ['.js']
+        extensions: ['.js'],
+        modules: [
+            path.resolve(__dirname),
+            'node_modules'
+        ]
     },
     module: {
         rules: [
@@ -26,6 +31,13 @@ module.exports = {
                 }
             }
         ]
+    },
+    devServer: {
+        static: {
+            directory: path.join(__dirname, 'client/public'),
+        },
+        compress: true,
+        port: 3000
     },
     devtool: 'source-map'
 };

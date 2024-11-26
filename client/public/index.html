@@ -1,25 +1,56 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StoonGame</title>
     <style>
-        body { margin: 0; }
-        canvas { display: block; }
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-family: Arial, sans-serif;
-            font-size: 24px;
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #1a1a1a;
             color: white;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        input[type="range"] {
+            width: 150px;
+            margin: 0 10px;
+        }
+        input[type="text"], input[type="number"] {
+            background-color: #333;
+            border: 1px solid #444;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 3px;
         }
     </style>
 </head>
 <body>
-    <div id="loading">Loading...</div>
-    <script src="/dist/bundle.js"></script>
+    <div id="game-container"></div>
+    <script type="module" src="/dist/bundle.js"></script>
+    <script>
+        window.addEventListener('DOMContentLoaded', (event) => {
+            console.log('DOM fully loaded and parsed');
+        });
+    </script>
 </body>
 </html>
