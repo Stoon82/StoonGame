@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>StoonGame - Triangle World Builder</title>
+    <link rel="stylesheet" href="css/styles.css">
     <style>
         body {
             margin: 0;
@@ -139,7 +141,15 @@
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+    <div id="stoonies-list">
+        <div id="statsPanel">
+            <h3>Stoonies</h3>
+            <div id="stooniesList"></div>
+        </div>
+    </div>
     <div id="previewPanel">
         <h3>Next Triangle</h3>
         <canvas id="previewCanvas"></canvas>
@@ -149,10 +159,6 @@
             <button id="newWorldBtn">New World</button>
             <button id="addStoonieBtn">Add Stoonie</button>
         </div>
-    </div>
-    <div id="statsPanel">
-        <h3>Stoonies</h3>
-        <div id="stooniesList"></div>
     </div>
     <div id="debugOverlay">
         <h4 style="margin: 0 0 10px 0;">Debug Info</h4>

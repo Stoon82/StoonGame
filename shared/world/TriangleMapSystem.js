@@ -204,6 +204,52 @@ class TriangleMapSystem {
         return groundTypes;
     }
 
+    // Get a triangle at the given grid coordinates
+    getTriangle(q, r) {
+        const centerKey = this.gridToKey(q, r);
+        if (!this.centerPoints.has(centerKey)) return null;
+
+        const center = this.centerPoints.get(centerKey);
+        const cornerPositions = this.calculateCornerPositions(q, r);
+        const groundTypes = this.getTriangleGroundTypes(q, r);
+
+        return {
+            q, r,
+            worldPos: center.worldPos,
+            groundTypes,
+            isUpward: (q + r) % 2 === 0
+        };
+    }
+
+    // Get neighboring triangles
+    getNeighbors(q, r) {
+        const isUpward = (q + r) % 2 === 0;
+        let neighbors;
+
+        if (isUpward) {
+            neighbors = [
+                { q: q-1, r: r-1 },  // Top left
+                { q: q+1, r: r-1 },  // Top right
+                { q: q, r: r+1 }     // Bottom
+            ];
+        } else {
+            neighbors = [
+                { q: q-1, r: r+1 },  // Bottom left
+                { q: q+1, r: r+1 },  // Bottom right
+                { q: q, r: r-1 }     // Top
+            ];
+        }
+
+        return neighbors;
+    }
+
+    // Get world position for grid coordinates
+    getWorldPosition(q, r) {
+        const centerKey = this.gridToKey(q, r);
+        if (!this.centerPoints.has(centerKey)) return null;
+        return this.centerPoints.get(centerKey).worldPos;
+    }
+
     // Debug method to log the current state of points
     logMapState() {
         console.log('\n[TriangleMapSystem] Current Map State:');

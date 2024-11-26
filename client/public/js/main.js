@@ -208,9 +208,81 @@ class Game {
     }
 
     animate() {
-        requestAnimationFrame(() => this.animate());
+        // Update Stoonies
+        this.stoonieManager.update();
+        this.updateStoonieStats();
+
+        // Update renderer
         this.renderer.render();
         this.previewRenderer.render();
+
+        requestAnimationFrame(() => this.animate());
+    }
+
+    updateStoonieStats() {
+        if (!this.stooniesList) return;
+
+        // Clear current list
+        this.stooniesList.innerHTML = '';
+
+        // Add stats for each Stoonie
+        for (const stoonie of this.stoonieManager.stoonies.values()) {
+            const stoonieDiv = document.createElement('div');
+            stoonieDiv.className = `stoonie-stats ${stoonie.gender}`;
+            
+            // Basic info
+            const ageInDays = stoonie.age.toFixed(1);
+            const basicInfo = document.createElement('div');
+            basicInfo.innerHTML = `
+                <strong>Stoonie #${stoonie.id.slice(0, 4)}</strong> (${stoonie.gender})
+                <br>Age: ${ageInDays} days
+                <br>State: ${stoonie.state}
+            `;
+            stoonieDiv.appendChild(basicInfo);
+
+            // Needs bars
+            const needsDiv = document.createElement('div');
+            needsDiv.style.marginTop = '5px';
+            
+            for (const [need, value] of Object.entries(stoonie.needs)) {
+                const needBar = document.createElement('div');
+                needBar.innerHTML = `
+                    <small>${need}: ${Math.round(value)}%</small>
+                    <div class="needs-bar">
+                        <div class="needs-bar-fill" style="width: ${value}%; 
+                            background: ${value < 20 ? '#ff4444' : '#4CAF50'}">
+                        </div>
+                    </div>
+                `;
+                needsDiv.appendChild(needBar);
+            }
+            stoonieDiv.appendChild(needsDiv);
+
+            // Add pregnancy info if applicable
+            if (stoonie.gender === 'female' && stoonie.pregnant) {
+                const pregnancyInfo = document.createElement('div');
+                pregnancyInfo.style.marginTop = '5px';
+                pregnancyInfo.innerHTML = `
+                    <small>Pregnancy: ${Math.round(stoonie.pregnancyProgress * 100)}%</small>
+                    <div class="needs-bar">
+                        <div class="needs-bar-fill" style="width: ${stoonie.pregnancyProgress * 100}%; 
+                            background: #9c27b0">
+                        </div>
+                    </div>
+                `;
+                stoonieDiv.appendChild(pregnancyInfo);
+            }
+
+            this.stooniesList.appendChild(stoonieDiv);
+        }
+    }
+
+    addRandomStoonie() {
+        const stoonie = this.stoonieManager.createStoonie();
+        if (stoonie) {
+            console.log('[Game] Created new Stoonie:', stoonie);
+            this.renderer.renderStoonie(stoonie);
+        }
     }
 }
 
