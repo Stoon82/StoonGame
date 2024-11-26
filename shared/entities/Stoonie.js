@@ -12,9 +12,9 @@ const generateUUID = () => {
 };
 
 export class Stoonie {
-    constructor(id = generateUUID(), position = { q: 0, r: 0 }, gender = Math.random() < 0.5 ? 'male' : 'female') {
+    constructor(gender = Math.random() < 0.5 ? 'male' : 'female') {
         // Basic attributes
-        this.id = id;
+        this.id = generateUUID();
         this.gender = gender;
         this.age = 0; // Age in days
         this.maxAge = 70 + Math.random() * 30; // Random max age between 70-100 days
@@ -22,12 +22,20 @@ export class Stoonie {
         this.pregnancyProgress = 0; // 0-1
         this.pregnancyDuration = 9; // 9 days for pregnancy
 
-        // Soul connection
-        this.connectedSoul = null;
-        this.hasConnectedSoul = false;
-
         // Position
-        this.position = position;
+        this.q = 0;
+        this.r = 0;
+        this.worldX = 0;
+        this.worldZ = 0;
+        this.targetWorldX = 0;
+        this.targetWorldZ = 0;
+        this.moveProgress = 1; // 1 means movement complete
+        this.moveDuration = 2; // seconds to complete a move
+        this.moveTimer = 0;
+        this.moveDelay = 1 + Math.random() * 2; // Random delay between moves
+        this.delayTimer = 0;
+        this.speed = 0.5; // units per second
+        this.wanderRadius = 0.4; // How far from triangle center they can wander
 
         // Needs system (0-100)
         this.needs = {
@@ -40,10 +48,10 @@ export class Stoonie {
 
         // Need decay rates per game tick
         this.decayRates = {
-            hunger: 0.1,
-            thirst: 0.15,
-            energy: 0.05,
-            sleep: 0.08
+            hunger: 1,
+            thirst: 1.5,
+            energy: 0.5,
+            sleep: 0.8
         };
 
         // Current activity
@@ -53,10 +61,14 @@ export class Stoonie {
         this.lastMoveTime = Date.now();
         this.moveInterval = 1000; // Move every 1 second
         this.state = 'idle'; // idle, moving, sleeping, eating
+
+        // Soul management
+        this.hasConnectedSoul = false;
+        this.connectedSoul = null;
     }
 
     // Update needs based on time passed
-    update(deltaTime) {
+    update(deltaTime, grid) {
         // Age the Stoonie
         this.age += deltaTime / (24 * 60 * 60); // Convert seconds to days
 
@@ -84,6 +96,25 @@ export class Stoonie {
             return this.die('poor_health');
         }
 
+        // Update movement
+        if (this.moveProgress >= 1) {
+            // Movement complete, update delay timer
+            this.delayTimer += deltaTime;
+            if (this.delayTimer >= this.moveDelay) {
+                this.delayTimer = 0;
+                this.startNewMove(grid);
+            }
+        } else {
+            // Update movement progress
+            this.moveTimer += deltaTime;
+            this.moveProgress = Math.min(1, this.moveTimer / this.moveDuration);
+            
+            // Smooth interpolation
+            const progress = this.easeInOutQuad(this.moveProgress);
+            this.worldX = this.startWorldX + (this.targetWorldX - this.startWorldX) * progress;
+            this.worldZ = this.startWorldZ + (this.targetWorldZ - this.startWorldZ) * progress;
+        }
+
         // Update pregnancy if applicable
         if (this.pregnant) {
             this.pregnancyProgress += deltaTime / (this.pregnancyDuration * 24 * 60 * 60);
@@ -102,21 +133,59 @@ export class Stoonie {
         return true; // Stoonie survives this update
     }
 
-    move(grid) {
-        if (!grid) return;
+    easeInOutQuad(t) {
+        return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    }
 
-        try {
-            // Get neighboring positions
-            const neighbors = grid.getNeighbors(this.position.q, this.position.r);
-            
-            if (neighbors && neighbors.length > 0) {
-                // Random movement for now - can be replaced with more intelligent pathfinding
-                const randomIndex = Math.floor(Math.random() * neighbors.length);
-                this.position = neighbors[randomIndex];
-            }
-        } catch (error) {
-            console.warn('Error during Stoonie movement:', error);
+    startNewMove(grid) {
+        // Get current triangle and its neighbors
+        const currentTriangle = grid.getTriangle(this.q, this.r);
+        if (!currentTriangle) return;
+
+        const neighbors = grid.getNeighbors(this.q, this.r)
+            .map(pos => grid.getTriangle(pos.q, pos.r))
+            .filter(triangle => triangle && !triangle.groundTypes.includes('WATER')); // Filter out water triangles
+
+        // Add current triangle if it's not water
+        if (!currentTriangle.groundTypes.includes('WATER')) {
+            neighbors.push(currentTriangle);
         }
+
+        if (neighbors.length === 0) return;
+
+        // Pick a random triangle from valid options
+        const targetTriangle = neighbors[Math.floor(Math.random() * neighbors.length)];
+        
+        // Get the world position of the target triangle
+        const worldPos = grid.getWorldPosition(targetTriangle.q, targetTriangle.r);
+        
+        // Add some random offset within the triangle
+        const randomAngle = Math.random() * Math.PI * 2;
+        const randomRadius = Math.random() * this.wanderRadius;
+        const offsetX = Math.cos(randomAngle) * randomRadius;
+        const offsetZ = Math.sin(randomAngle) * randomRadius;
+
+        // Store current position
+        this.startWorldX = this.worldX;
+        this.startWorldZ = this.worldZ;
+        
+        // Set target position with offset
+        this.targetWorldX = worldPos.x + offsetX;
+        this.targetWorldZ = worldPos.z + offsetZ;
+        
+        // Update grid position
+        this.q = targetTriangle.q;
+        this.r = targetTriangle.r;
+        
+        // Calculate movement duration based on distance and speed
+        const dx = this.targetWorldX - this.startWorldX;
+        const dz = this.targetWorldZ - this.startWorldZ;
+        const distance = Math.sqrt(dx * dx + dz * dz);
+        this.moveDuration = distance / this.speed;
+        
+        // Reset movement progress
+        this.moveProgress = 0;
+        this.moveTimer = 0;
     }
 
     updateState() {
@@ -145,7 +214,7 @@ export class Stoonie {
                 this.needs.thirst = Math.max(0, this.needs.thirst - deltaTime * 20);
                 break;
             case 'moving':
-                this.move(window.game.grid); // Access grid through game instance
+                //this.move(window.game.grid); // Access grid through game instance
                 break;
         }
     }
@@ -235,7 +304,7 @@ export class Stoonie {
             id: this.id,
             gender: this.gender,
             age: Math.floor(this.age),
-            position: this.position,
+            position: { q: this.q, r: this.r, worldX: this.worldX, worldZ: this.worldZ },
             needs: this.needs,
             activity: this.currentActivity,
             pregnant: this.pregnant,
@@ -272,7 +341,8 @@ export class Stoonie {
 
     // Move to a new position on the grid
     moveTo(q, r) {
-        this.position = { q, r };
+        this.q = q;
+        this.r = r;
         this.needs.energy = Math.max(0, this.needs.energy - 5); // Moving costs energy
     }
 }

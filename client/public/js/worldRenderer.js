@@ -13,6 +13,7 @@ class WorldRenderer {
         this.mouse = new THREE.Vector2();
         this.isPreview = isPreview;
         this.previewMesh = null;
+        this.stoonieMeshes = new Map(); // Store Stoonie meshes by ID
         
         this.setupScene();
         if (!isPreview) {
@@ -81,6 +82,7 @@ class WorldRenderer {
         while(this.scene.children.length > 0){ 
             this.scene.remove(this.scene.children[0]); 
         }
+        this.stoonieMeshes.clear();
         this.setupScene();
     }
 
@@ -147,6 +149,49 @@ class WorldRenderer {
             this.scene.remove(this.previewMesh);
             this.previewMesh = null;
         }
+    }
+
+    renderStoonie(stoonie) {
+        // Create a Stoonie mesh - a sphere for now
+        const geometry = new THREE.SphereGeometry(0.2, 32, 32);
+        const material = new THREE.MeshPhongMaterial({ 
+            color: stoonie.gender === 'male' ? 0x4444ff : 0xff4444,
+            emissive: stoonie.gender === 'male' ? 0x222266 : 0x662222,
+            shininess: 30
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        
+        // Position the Stoonie using world coordinates
+        mesh.position.set(stoonie.worldX, 0.5, stoonie.worldZ);
+        
+        // Store the mesh
+        this.stoonieMeshes.set(stoonie.id, mesh);
+        this.scene.add(mesh);
+        
+        return mesh;
+    }
+
+    updateStoonie(stoonie) {
+        const mesh = this.stoonieMeshes.get(stoonie.id);
+        if (mesh) {
+            mesh.position.set(stoonie.worldX, 0.5, stoonie.worldZ);
+        }
+    }
+
+    removeStoonie(stoonieId) {
+        const mesh = this.stoonieMeshes.get(stoonieId);
+        if (mesh) {
+            this.scene.remove(mesh);
+            this.stoonieMeshes.delete(stoonieId);
+        }
+    }
+
+    gridToWorld(q, r) {
+        const size = 1; // Triangle size
+        const h = size * Math.sqrt(3);
+        const x = q * size;
+        const z = r * h;
+        return { x, z };
     }
 }
 

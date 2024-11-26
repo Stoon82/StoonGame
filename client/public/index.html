@@ -61,6 +61,59 @@
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        .button-group button {
+            flex: 1;
+        }
+        #addStoonieBtn {
+            background-color: #2196F3;
+        }
+        #addStoonieBtn:hover {
+            background-color: #1976D2;
+        }
+        #statsPanel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            max-height: 300px;
+            overflow-y: auto;
+            color: white;
+        }
+        .stoonie-stats {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+        }
+        .stoonie-stats.male {
+            border-left: 3px solid #4444ff;
+        }
+        .stoonie-stats.female {
+            border-left: 3px solid #ff4444;
+        }
+        .needs-bar {
+            width: 100%;
+            height: 4px;
+            background: #333;
+            margin-top: 2px;
+            border-radius: 2px;
+        }
+        .needs-bar-fill {
+            height: 100%;
+            background: #4CAF50;
+            border-radius: 2px;
+            transition: width 0.3s ease;
         }
     </style>
 </head>
@@ -71,7 +124,14 @@
         <canvas id="previewCanvas"></canvas>
     </div>
     <div id="controls">
-        <button id="newWorldBtn">New World</button>
+        <div class="button-group">
+            <button id="newWorldBtn">New World</button>
+            <button id="addStoonieBtn">Add Stoonie</button>
+        </div>
+    </div>
+    <div id="statsPanel">
+        <h3>Stoonies</h3>
+        <div id="stooniesList"></div>
     </div>
     <script type="module" src="/dist/bundle.js"></script>
 </body>

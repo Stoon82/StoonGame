@@ -1,5 +1,6 @@
 import WorldRenderer from './worldRenderer.js';
-import TriangleGrid from '../../../shared/world/TriangleGrid.js';
+import TriangleGrid from '@shared/world/TriangleGrid.js';
+import { StoonieManager } from '@shared/entities/StoonieManager.js';
 
 console.log('Initializing game...');
 
@@ -9,32 +10,44 @@ class Game {
         this.previewCanvas = document.getElementById('previewCanvas');
         this.previewCanvas.width = 200;
         this.previewCanvas.height = 200;
+        this.stooniesList = document.getElementById('stooniesList');
 
         if (!this.canvas || !this.previewCanvas) {
             console.error('Canvas elements not found!');
             return;
         }
 
-        // Initialize renderers
+        // Initialize managers
+        this.grid = new TriangleGrid();
         this.renderer = new WorldRenderer(this.canvas);
         this.previewRenderer = new WorldRenderer(this.previewCanvas, true);
-        this.grid = new TriangleGrid();
-        
-        // Set up controls
-        this.setupControls();
-        
-        // Generate initial world
+        this.stoonieManager = new StoonieManager(this.grid);
+
+        // Initialize UI state
+        this.currentPreviewGroundTypes = null;
+
+        this.setupEventListeners();
         this.generateNewWorld();
-        
-        // Start animation loop
         this.animate();
     }
 
-    setupControls() {
-        const newWorldBtn = document.getElementById('newWorldBtn');
-        if (newWorldBtn) {
-            newWorldBtn.addEventListener('click', () => this.generateNewWorld());
-        }
+    setupEventListeners() {
+        // World generation
+        document.getElementById('newWorldBtn').addEventListener('click', () => this.generateNewWorld());
+
+        // Stoonie management
+        document.getElementById('addStoonieBtn').addEventListener('click', () => this.addRandomStoonie());
+
+        // Mouse interaction
+        this.canvas.addEventListener('mousemove', (event) => {
+            const rect = this.canvas.getBoundingClientRect();
+            this.handleMouseMove(event.clientX - rect.left, event.clientY - rect.top);
+        });
+
+        this.canvas.addEventListener('click', (event) => {
+            const rect = this.canvas.getBoundingClientRect();
+            this.handleCanvasClick(event.clientX - rect.left, event.clientY - rect.top);
+        });
 
         // Setup click handler for placing triangles
         this.canvas.addEventListener('click', (event) => {
@@ -62,7 +75,7 @@ class Game {
         console.log('Generating new world...');
         this.renderer.clear();
         this.grid.clear();
-        
+
         // Create initial hexagon with 6 triangles
         const initialTriangles = [
             { q: 0, r: 0 },      // Bottom-Center
@@ -95,13 +108,13 @@ class Game {
 
     generateNewPreviewTriangle() {
         const groundTypes = this.generateRandomGroundTypes();
-        
+
         // Clear previous preview
         this.previewRenderer.clear();
-        
+
         // Render preview triangle at center of preview canvas
         this.previewRenderer.renderTriangle(0, 0, groundTypes);
-        
+
         // Store current preview ground types
         this.currentPreviewGroundTypes = groundTypes;
     }
@@ -159,8 +172,70 @@ class Game {
         }
     }
 
+    addRandomStoonie() {
+        // Get all placed triangles
+        const placedTriangles = Array.from(this.grid.triangles.values());
+        if (placedTriangles.length === 0) {
+            console.log('No triangles placed yet!');
+            return;
+        }
+
+        // Pick a random triangle
+        const randomTriangle = placedTriangles[Math.floor(Math.random() * placedTriangles.length)];
+        console.log('Selected triangle:', randomTriangle);
+
+        // Create a new Stoonie at this position
+        const stoonie = this.stoonieManager.createStoonie(randomTriangle.q, randomTriangle.r);
+        console.log('Created Stoonie:', stoonie);
+
+        // Add the Stoonie to the renderer
+        this.renderer.renderStoonie(stoonie);
+    }
+
+    updateStoonieStats() {
+        if (!this.stooniesList) return;
+        
+        const stoonies = this.stoonieManager.getStoonies();
+        this.stooniesList.innerHTML = '';
+        
+        for (const stoonie of stoonies) {
+            const status = stoonie.getStatus();
+            const div = document.createElement('div');
+            div.className = `stoonie-stats ${status.gender}`;
+            
+            div.innerHTML = `
+                <div>ID: ${status.id.slice(0, 6)}... (${status.gender})</div>
+                <div>Age: ${status.age.toFixed(1)} days</div>
+                <div>Position: (${status.position.q}, ${status.position.r})</div>
+                ${Object.entries(status.needs).map(([need, value]) => `
+                    <div>${need}: ${value.toFixed(1)}
+                        <div class="needs-bar">
+                            <div class="needs-bar-fill" style="width: ${value}%"></div>
+                        </div>
+                    </div>
+                `).join('')}
+            `;
+            
+            this.stooniesList.appendChild(div);
+        }
+    }
+
     animate() {
         requestAnimationFrame(() => this.animate());
+
+        // Update Stoonies
+        this.stoonieManager.update();
+        
+        // Update Stoonie positions in renderer
+        const stoonies = this.stoonieManager.getStoonies();
+        for (const stoonie of stoonies) {
+            this.renderer.updateStoonie(stoonie);
+        }
+
+        // Update stats panel
+        this.updateStoonieStats();
+
+        // Render the scene
         this.renderer.render();
         this.previewRenderer.render();
     }

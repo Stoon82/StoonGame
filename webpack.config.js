@@ -23,7 +23,10 @@ module.exports = {
         ]
     },
     resolve: {
-        extensions: ['.js']
+        extensions: ['.js'],
+        alias: {
+            '@shared': path.resolve(__dirname, 'shared')
+        }
     },
     devServer: {
         static: {
@@ -35,3 +38,4 @@ module.exports = {
     },
     devtool: 'source-map'
 };
+

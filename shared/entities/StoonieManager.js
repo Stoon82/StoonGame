@@ -1,13 +1,21 @@
 import { Stoonie } from './Stoonie.js';
 
 export class StoonieManager {
-    constructor() {
+    constructor(grid) {
+        this.grid = grid;
         this.stoonies = new Map(); // All living Stoonies
         this.selectedStoonieId = null;
+        this.lastUpdateTime = performance.now() / 1000;
     }
 
-    createStoonie(gender = null) {
+    createStoonie(q, r, gender = null) {
         const stoonie = new Stoonie(gender);
+        stoonie.q = q;
+        stoonie.r = r;
+        stoonie.targetQ = q;
+        stoonie.targetR = r;
+        stoonie.startQ = q;
+        stoonie.startR = r;
         this.stoonies.set(stoonie.id, stoonie);
         return stoonie;
     }
@@ -47,19 +55,15 @@ export class StoonieManager {
         return this.stoonies.get(this.selectedStoonieId);
     }
 
-    update(deltaTime) {
-        // Create a new Map to store surviving Stoonies
-        const survivors = new Map();
-        
-        // Update each Stoonie
-        for (const [id, stoonie] of this.stoonies) {
-            if (stoonie.update(deltaTime)) {
-                survivors.set(id, stoonie);
-            }
+    update() {
+        const currentTime = performance.now() / 1000;
+        const deltaTime = currentTime - this.lastUpdateTime;
+        this.lastUpdateTime = currentTime;
+
+        // Update all Stoonies
+        for (const stoonie of this.stoonies.values()) {
+            stoonie.update(deltaTime, this.grid);
         }
-        
-        // Replace the stoonies map with survivors
-        this.stoonies = survivors;
     }
 
     getStatus() {
