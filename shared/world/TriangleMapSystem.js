@@ -1,7 +1,7 @@
 // A map system that uses separate arrays for corner points and center points
 class TriangleMapSystem {
     constructor() {
-        // Map to store corner points: key is "x,z", value is {worldPos: {x,z}, gridPos: {q,r}, groundTypes: string[]}
+        // Map to store corner points: key is "x,z", value is {worldPos: {x,z}, gridPos: {q,r}, groundType: string}
         this.cornerPoints = new Map();
         // Map to store center points: key is "q,r", value is {worldPos: {x,z}, groundType: string}
         this.centerPoints = new Map();
@@ -78,7 +78,7 @@ class TriangleMapSystem {
     // Get the ground type index for a corner based on its position
     getCornerGroundTypeIndex(cornerIndex, isUpward) {
         if (isUpward) {
-            return cornerIndex === 0 ? 2 : // Bottom left -> left
+            return cornerIndex === 2 ? 2 : // Bottom left -> left
                    cornerIndex === 1 ? 1 : // Bottom right -> right
                    3;                      // Top -> top/bottom
         } else {
@@ -88,161 +88,120 @@ class TriangleMapSystem {
         }
     }
 
-    // Try to add a triangle at given grid coordinates with specified ground types
-    // groundTypes is an array of 4 elements: [center, right, left, top/bottom]
-    canAddTriangle(q, r, groundTypes) {
-        console.log(`\n[TriangleMapSystem] Validating triangle at (${q}, ${r}) with types:`, groundTypes);
+    // Try to add a triangle at given grid coordinates with specified ground type
+    canAddTriangle(q, r) {
+        const centerKey = this.gridToKey(q, r);
         
         // Check if center point already exists
-        if (this.hasCenterPoint(q, r)) {
-            console.log(`[TriangleMapSystem] ❌ Validation failed: Center point already exists at (${q}, ${r})`);
-            return { valid: false, corners: [] };
+        if (this.centerPoints.has(centerKey)) {
+            return { valid: false, reason: "Center point already exists" };
         }
 
+        // Get corner positions
         const cornerPositions = this.calculateCornerPositions(q, r);
-        const isUpward = (q + r) % 2 === 0;
+        const existingCorners = cornerPositions.map(pos => 
+            this.cornerPoints.has(this.worldToKey(pos.x, pos.z))
+        );
+        
+        // Count existing corners
+        const numExistingCorners = existingCorners.filter(exists => exists).length;
 
-        // Log all registered corner points
-        console.log('\nRegistered Corner Points:');
-        this.cornerPoints.forEach((value, key) => {
-            console.log(`${key}:`, value.groundTypes);
-        });
-
-        // Log cursor triangle corner positions
-        console.log('\nCursor Triangle Corners:');
-        cornerPositions.forEach((pos, i) => {
-            const key = this.worldToKey(pos.x, pos.z);
-            console.log(`Corner ${i}: ${key}`);
-            console.log(`  Position:`, pos);
-            console.log(`  Ground Type Index:`, this.getCornerGroundTypeIndex(i, isUpward));
-            console.log(`  Ground Type:`, groundTypes[this.getCornerGroundTypeIndex(i, isUpward)]);
-            const existing = this.cornerPoints.get(key);
-            if (existing) {
-                console.log(`  Existing Ground Types:`, existing.groundTypes);
-            } else {
-                console.log(`  No existing point`);
-            }
-        });
-
-        const validationResults = {
-            valid: true,
-            corners: []
-        };
-
-        let hasMatchingCorner = false;
-
-        // Check each corner
-        for (let i = 0; i < 3; i++) {
-            const cornerPos = cornerPositions[i];
-            const cornerKey = this.worldToKey(cornerPos.x, cornerPos.z);
-            const existingCorner = this.cornerPoints.get(cornerKey);
-            const groundTypeIndex = this.getCornerGroundTypeIndex(i, isUpward);
-            const newGroundType = groundTypes[groundTypeIndex];
-
-            let cornerValid = true;
-            let cornerTypes = [];
-
-            if (existingCorner) {
-                cornerTypes = existingCorner.groundTypes;
-                console.log(`[TriangleMapSystem] Checking corner ${i} at ${cornerKey}:`, {
-                    existing: cornerTypes,
-                    new: newGroundType,
-                    index: groundTypeIndex
-                });
-
-                // Check if this corner already has a different ground type
-                if (cornerTypes.length > 0) {
-                    if (cornerTypes[0] !== newGroundType) {
-                        cornerValid = false;
-                        console.log(`[TriangleMapSystem] ❌ Corner ${i} has different ground type`);
-                        console.log(`  Existing type: ${cornerTypes[0]}`);
-                        console.log(`  Attempted new type: ${newGroundType}`);
-                        validationResults.valid = false;
-                    } else {
-                        hasMatchingCorner = true;
-                        console.log(`[TriangleMapSystem] ✅ Found matching corner at ${i} with type: ${newGroundType}`);
-                    }
-                }
-            } else {
-                console.log(`[TriangleMapSystem] Corner ${i} is new`);
-            }
-
-            validationResults.corners.push({
-                x: cornerPos.x,
-                z: cornerPos.z,
-                valid: cornerValid,
-                groundType: newGroundType,
-                existing: cornerTypes,
-                cornerIndex: i,
-                isUpward: isUpward
-            });
+        // If this is the first triangle, always allow it
+        if (this.centerPoints.size === 0) {
+            return { valid: true, reason: "First triangle" };
         }
 
-        // If no corner matches an existing corner point with same ground type, fail validation
-        if (!hasMatchingCorner && this.cornerPoints.size > 0) {
-            console.log(`[TriangleMapSystem] ❌ Validation failed: No corner connects to existing triangle with matching ground type`);
-            validationResults.valid = false;
+        // For subsequent triangles, require exactly 2 existing corners
+        if (numExistingCorners !== 2) {
+            return { valid: false, reason: `Need exactly 2 existing corners, found ${numExistingCorners}` };
         }
 
-        console.log(`[TriangleMapSystem] Validation ${validationResults.valid ? '✅ passed' : '❌ failed'} for triangle at (${q}, ${r})`);
-        return validationResults;
+        return { valid: true, reason: "Valid placement" };
     }
 
-    // Add a triangle at given grid coordinates with specified ground types
+    // Add a triangle at given grid coordinates with specified ground type
     // Returns true if successful, false if not possible
-    addTriangle(q, r, groundTypes) {
-        console.log(`[TriangleMapSystem] Adding triangle at (${q}, ${r}) with types:`, groundTypes);
-        
-        // Validate before adding
-        const validation = this.canAddTriangle(q, r, groundTypes);
-        if (!validation.valid) {
-            console.log(`[TriangleMapSystem] ❌ Cannot add triangle: validation failed`);
-            return false;
-        }
-
+    addTriangle(q, r, newGroundType) {
+        const centerKey = this.gridToKey(q, r);
         const cornerPositions = this.calculateCornerPositions(q, r);
         const centerPos = this.calculateCenterPosition(q, r);
         const isUpward = (q + r) % 2 === 0;
-
-        // Add center point
-        const centerKey = this.gridToKey(q, r);
-        this.centerPoints.set(centerKey, {
-            worldPos: centerPos,
-            groundType: groundTypes[0] // Center ground type
+        
+        // Check if all points already exist
+        const centerExists = this.centerPoints.has(centerKey);
+        const cornerExists = cornerPositions.every(pos => {
+            const key = this.worldToKey(pos.x, pos.z);
+            return this.cornerPoints.has(key);
         });
-        console.log(`[TriangleMapSystem] Added center point at (${q}, ${r}) with type:`, groundTypes[0]);
 
-        // Add or update corner points
-        for (let i = 0; i < 3; i++) {
-            const cornerPos = cornerPositions[i];
-            const cornerKey = this.worldToKey(cornerPos.x, cornerPos.z);
-            let cornerPoint = this.cornerPoints.get(cornerKey);
-            const groundTypeIndex = this.getCornerGroundTypeIndex(i, isUpward);
-            const newGroundType = groundTypes[groundTypeIndex];
-
-            if (!cornerPoint) {
-                cornerPoint = {
-                    worldPos: cornerPos,
-                    gridPos: { q, r },
-                    groundTypes: [newGroundType]
-                };
-                this.cornerPoints.set(cornerKey, cornerPoint);
-                console.log(`[TriangleMapSystem] Added new corner point at (${cornerPos.x}, ${cornerPos.z}) with type:`, newGroundType);
-            } else if (!cornerPoint.groundTypes.includes(newGroundType)) {
-                // This should never happen since we validated, but let's be safe
-                if (cornerPoint.groundTypes.length > 0 && cornerPoint.groundTypes[0] !== newGroundType) {
-                    console.error(`[TriangleMapSystem] ⚠️ Inconsistent state: Trying to add mismatched ground type ${newGroundType} to corner with ${cornerPoint.groundTypes[0]}`);
-                    return false;
-                }
-                cornerPoint.groundTypes.push(newGroundType);
-                console.log(`[TriangleMapSystem] Updated corner point at (${cornerPos.x}, ${cornerPos.z}), added type:`, newGroundType);
-            }
+        if (centerExists && cornerExists) {
+            console.log('[TriangleMapSystem] All points already exist at:', {q, r});
+            return false;
         }
 
-        // Log the state after adding the triangle
-        this.logMapState();
-        this.updateDebugOverlay();
+        // For each corner position, find if there's an existing point at that world location
+        const existingCorners = cornerPositions.map(pos => {
+            const worldKey = this.worldToKey(pos.x, pos.z);
+            return Array.from(this.cornerPoints.values())
+                .find(point => this.worldToKey(point.worldPos.x, point.worldPos.z) === worldKey);
+        });
+
+        // Add center point if it doesn't exist at this grid position
+        if (!centerExists) {
+            this.centerPoints.set(centerKey, { 
+                worldPos: centerPos,
+                groundType: newGroundType
+            });
+        }
+
+        // Add corner points if they don't exist at their grid positions
+        cornerPositions.forEach((pos, index) => {
+            const key = this.worldToKey(pos.x, pos.z);
+            if (!this.cornerPoints.has(key)) {
+                const groundTypeIndex = isUpward ? 
+                    (index === 0 ? 1 : index === 1 ? 3 : 2) :  // upward: top, bottom left, bottom right
+                    (index === 0 ? 3 : index === 1 ? 2 : 1);   // downward: bottom, top left, top right
+                
+                this.cornerPoints.set(key, {
+                    worldPos: pos,
+                    gridPos: { q, r },
+                    groundType: existingCorners[index]?.groundType ?? newGroundType
+                });
+            }
+        });
+
         return true;
+    }
+
+    // Get the ground types for a triangle at given grid coordinates
+    getTriangleGroundTypes(q, r) {
+        const centerKey = this.gridToKey(q, r);
+        const cornerPositions = this.calculateCornerPositions(q, r);
+        const isUpward = (q + r) % 2 === 0;
+        
+        // Get center ground type
+        const center = this.centerPoints.get(centerKey);
+        const groundTypes = [center?.groundType];
+        
+        // Get corner ground types based on triangle orientation
+        const corners = cornerPositions.map(pos => {
+            const key = this.worldToKey(pos.x, pos.z);
+            return this.cornerPoints.get(key);
+        });
+
+        if (isUpward) {
+            // Upward triangle
+            groundTypes[1] = corners[2]?.groundType;  // top
+            groundTypes[2] = corners[1]?.groundType;  // bottom right
+            groundTypes[3] = corners[0]?.groundType;  // bottom left
+        } else {
+            // Downward triangle
+            groundTypes[1] = corners[0]?.groundType;  // top left
+            groundTypes[2] = corners[1]?.groundType;  // top right
+            groundTypes[3] = corners[2]?.groundType;  // bottom
+        }
+
+        return groundTypes;
     }
 
     // Debug method to log the current state of points
@@ -261,7 +220,7 @@ class TriangleMapSystem {
             console.log(`Key: ${key}`);
             console.log('  World Position:', value.worldPos);
             console.log('  Grid Position:', value.gridPos);
-            console.log('  Ground Types:', value.groundTypes);
+            console.log('  Ground Type:', value.groundType);
         });
 
         console.log(`\nTotal Centers: ${this.centerPoints.size}, Total Corners: ${this.cornerPoints.size}\n`);
@@ -276,7 +235,7 @@ class TriangleMapSystem {
             debugText += `\n${key}:\n`;
             debugText += `  World Pos: (${value.worldPos.x.toFixed(2)}, ${value.worldPos.z.toFixed(2)})\n`;
             debugText += `  Grid Pos: (${value.gridPos.q}, ${value.gridPos.r})\n`;
-            debugText += `  Ground Types: [${value.groundTypes.join(', ')}]\n`;
+            debugText += `  Ground Type: ${value.groundType}\n`;
         });
 
         debugElement.textContent = debugText;
@@ -288,12 +247,13 @@ class TriangleMapSystem {
             this.cornerPoints.set(key, {
                 worldPos: { x: worldX, z: worldZ },
                 gridPos: { q: gridQ, r: gridR },
-                groundTypes: []
+                groundType: groundType
             });
-        }
-        const point = this.cornerPoints.get(key);
-        if (!point.groundTypes.includes(groundType)) {
-            point.groundTypes.push(groundType);
+        } else {
+            const point = this.cornerPoints.get(key);
+            if (point.groundType !== groundType) {
+                point.groundType = groundType;
+            }
         }
         this.updateDebugOverlay();
     }

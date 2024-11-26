@@ -1,6 +1,7 @@
 import WorldRenderer from './worldRenderer.js';
 import TriangleMapSystem from '@shared/world/TriangleMapSystem.js';
 import { StoonieManager } from '@shared/entities/StoonieManager.js';
+import { getRandomGroundType } from '@shared/world/groundTypes.js';
 
 console.log('Initializing game...');
 
@@ -27,7 +28,7 @@ class Game {
         this.stoonieManager = new StoonieManager(this.mapSystem);
 
         // Initialize UI state
-        this.currentPreviewGroundTypes = this.generateRandomGroundTypes(); // [center, right, left, top/bottom]
+        this.currentCursorGroundType = getRandomGroundType();
 
         this.setupEventListeners();
         this.generateNewWorld();
@@ -37,14 +38,15 @@ class Game {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Shift') {
                 window.DEBUG_MODE = true;
+                document.getElementById('debugOverlay').classList.add('visible');
                 console.log('[Debug] Debug mode enabled');
             } else if (e.key === ' ') { // Space key
-                this.currentPreviewGroundTypes = this.generateRandomGroundTypes();
-                console.log('[Game] Rerolled preview ground types:', this.currentPreviewGroundTypes);
+                this.currentCursorGroundType = getRandomGroundType();
+                console.log('[Game] Rerolled cursor ground type:', this.currentCursorGroundType);
                 
                 // Update both preview canvases
                 this.previewRenderer.clear();
-                this.previewRenderer.renderTriangle(0, 0, this.currentPreviewGroundTypes);
+                this.previewRenderer.renderTriangle(0, 0, [this.currentCursorGroundType, this.currentCursorGroundType, this.currentCursorGroundType, this.currentCursorGroundType]);
                 
                 // Update the hover preview if it exists
                 const mousePos = this.renderer.getLastMousePosition();
@@ -57,6 +59,7 @@ class Game {
         document.addEventListener('keyup', (e) => {
             if (e.key === 'Shift') {
                 window.DEBUG_MODE = false;
+                document.getElementById('debugOverlay').classList.remove('visible');
                 console.log('[Debug] Debug mode disabled');
                 // Clear any existing debug markers
                 this.renderer.removePreviewMesh();
@@ -98,20 +101,21 @@ class Game {
 
         // Create initial hexagon with 6 triangles
         const initialTriangles = [
-            { q: 0, r: 0 },      // Bottom-Center
+            { q: 0, r: 0 } ]; /*,      // Bottom-Center
             { q: -1, r: 0 },     // Bottom-Left
             { q: -1, r: 1 },     // Top-Left
             { q: 0, r: 1 },      // Top-Center
             { q: 1, r: 1 },      // Top-Right
             { q: 1, r: 0 }       // Bottom-Right
-        ];
+        ]; */
 
         console.log('[Game] Adding initial triangles...');
         initialTriangles.forEach(pos => {
-            const groundTypes = this.generateRandomGroundTypes();
-            const success = this.mapSystem.addTriangle(pos.q, pos.r, groundTypes);
+            const groundType = getRandomGroundType();
+            const success = this.mapSystem.addTriangle(pos.q, pos.r, groundType);
             console.log(`[Game] Added triangle at (${pos.q}, ${pos.r}): ${success ? '✅' : '❌'}`);
             if (success) {
+                const groundTypes = this.mapSystem.getTriangleGroundTypes(pos.q, pos.r);
                 this.renderer.renderTriangle(pos.q, pos.r, groundTypes);
             }
         });
@@ -119,61 +123,65 @@ class Game {
         // Log final state
         console.log('[Game] Initial world generation complete');
         this.mapSystem.logMapState();
+        this.mapSystem.updateDebugOverlay();  // Update debug overlay after world generation
 
         // Generate new preview triangle
-        this.generateNewPreviewTriangle();
+        this.previewRenderer.clear();
+        this.previewRenderer.renderTriangle(0, 0, [this.currentCursorGroundType, this.currentCursorGroundType, this.currentCursorGroundType, this.currentCursorGroundType]);
     }
 
-    generateRandomGroundTypes() {
-        const types = ['GRASS', 'WATER', 'SAND', 'ROCK'];
-        return [
-            types[Math.floor(Math.random() * types.length)], // center
-            types[Math.floor(Math.random() * types.length)], // right
-            types[Math.floor(Math.random() * types.length)], // left
-            types[Math.floor(Math.random() * types.length)]  // top/bottom
-        ];
+    generateRandomGroundType() {
+        return getRandomGroundType();
     }
 
     handleMouseMove(x, y) {
-        const gridPos = this.renderer.getPreviewGridPosition(x, y);
-        if (!gridPos) {
-            this.renderer.removePreviewMesh();
-            return;
-        }
+        const gridPos = this.renderer.getGridPosition(x, y);
+        if (!gridPos) return;
 
-        // Update cursor debug info
-        const debugElement = document.getElementById('cursorDebug');
-        if (debugElement) {
-            const cornerPositions = this.mapSystem.calculateCornerPositions(gridPos.q, gridPos.r);
-            const isUpward = (gridPos.q + gridPos.r) % 2 === 0;
-            
-            let debugText = `Grid Pos: (${gridPos.q}, ${gridPos.r})\n`;
-            debugText += `Is Upward: ${isUpward}\n`;
-            debugText += `Ground Types: [${this.currentPreviewGroundTypes.join(', ')}]\n\n`;
-            
-            cornerPositions.forEach((pos, i) => {
-                const key = this.mapSystem.worldToKey(pos.x, pos.z);
-                const groundTypeIndex = this.mapSystem.getCornerGroundTypeIndex(i, isUpward);
-                debugText += `Corner ${i}:\n`;
-                debugText += `  World Pos: (${pos.x.toFixed(2)}, ${pos.z.toFixed(2)})\n`;
-                debugText += `  Key: ${key}\n`;
-                debugText += `  Ground Type Index: ${groundTypeIndex}\n`;
-                debugText += `  Ground Type: ${this.currentPreviewGroundTypes[groundTypeIndex]}\n`;
-                
-                const existing = this.mapSystem.cornerPoints.get(key);
-                if (existing) {
-                    debugText += `  Existing Types: [${existing.groundTypes.join(', ')}]\n`;
-                } else {
-                    debugText += `  No existing point\n`;
-                }
-                debugText += '\n';
-            });
-            
-            debugElement.textContent = debugText;
-        }
+        // Get preview ground types, ensuring no undefined values
+        let previewGroundTypes = this.mapSystem.getTriangleGroundTypes(gridPos.q, gridPos.r) || 
+            [null, null, null, null];
+        
+        // Replace any null/undefined values with current cursor ground type
+        previewGroundTypes = previewGroundTypes.map(type => type || this.currentCursorGroundType);
 
         // Update preview mesh
-        this.renderer.showPreviewTriangle(gridPos.q, gridPos.r, this.currentPreviewGroundTypes);
+        this.renderer.showPreviewTriangle(gridPos.q, gridPos.r, previewGroundTypes);
+
+        // Update debug info
+        if (window.DEBUG_MODE) {
+            const debugElement = document.getElementById('cursorDebug');
+            if (debugElement) {
+                const cornerPositions = this.mapSystem.calculateCornerPositions(gridPos.q, gridPos.r);
+                const isUpward = (gridPos.q + gridPos.r) % 2 === 0;
+                
+                let debugText = `Grid Pos: (${gridPos.q}, ${gridPos.r})\n`;
+                debugText += `Is Upward: ${isUpward}\n`;
+                debugText += `Ground Types: [${previewGroundTypes.join(', ')}]\n\n`;
+                
+                cornerPositions.forEach((pos, i) => {
+                    const key = this.mapSystem.worldToKey(pos.x, pos.z);
+                    debugText += `Corner ${i}:\n`;
+                    debugText += `  World Pos: (${pos.x.toFixed(2)}, ${pos.z.toFixed(2)})\n`;
+                    debugText += `  Key: ${key}\n`;
+                    
+                    const existing = this.mapSystem.cornerPoints.get(key);
+                    if (existing) {
+                        debugText += `  Ground Type: ${existing.groundType}\n`;
+                    } else {
+                        debugText += `  No existing point\n`;
+                    }
+                    debugText += '\n';
+                });
+                
+                debugElement.textContent = debugText;
+            }
+        }
+    }
+
+    getPreviewGroundTypes(q, r) {
+        return this.mapSystem.getTriangleGroundTypes(q, r) || 
+            [this.currentCursorGroundType, this.currentCursorGroundType, this.currentCursorGroundType, this.currentCursorGroundType];
     }
 
     handleCanvasClick(x, y) {
@@ -181,24 +189,22 @@ class Game {
         if (!gridPos) return;
 
         console.log('\n[Game] Attempting to add triangle at:', gridPos);
-        console.log('Current Map State BEFORE adding:');
-        this.mapSystem.logMapState();
 
-        // Try to add the triangle
-        if (this.mapSystem.addTriangle(gridPos.q, gridPos.r, this.currentPreviewGroundTypes)) {
-            console.log('\n[Game] Successfully added triangle. New Map State:');
-            this.mapSystem.logMapState();
-            this.renderer.renderTriangle(gridPos.q, gridPos.r, this.currentPreviewGroundTypes);
-            this.generateNewPreviewTriangle();
+        // Generate a random ground type for this placement attempt
+        const newGroundType = getRandomGroundType();
+        console.log('[Game] Generated new ground type:', newGroundType);
+
+        // Try to add the triangle with the new ground type
+        const success = this.mapSystem.addTriangle(gridPos.q, gridPos.r, newGroundType);
+        if (success) {
+            console.log('\n[Game] Successfully added triangle');
+            // Get the actual ground types from the map system
+            const groundTypes = this.mapSystem.getTriangleGroundTypes(gridPos.q, gridPos.r);
+            this.renderer.renderTriangle(gridPos.q, gridPos.r, groundTypes);
+            this.mapSystem.updateDebugOverlay();
         } else {
             console.log('\n[Game] Failed to add triangle at:', gridPos);
         }
-    }
-
-    generateNewPreviewTriangle() {
-        this.currentPreviewGroundTypes = this.generateRandomGroundTypes();
-        this.previewRenderer.clear();
-        this.previewRenderer.renderTriangle(0, 0, this.currentPreviewGroundTypes);
     }
 
     animate() {

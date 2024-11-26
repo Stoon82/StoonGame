@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import GridTriangleRenderer from './gridTriangleRenderer.js';
+import { getGroundTypeColor } from '@shared/world/groundTypes.js';
 
 class WorldRenderer {
     constructor(canvas, isPreview = false, mapSystem = null) {
@@ -136,8 +137,8 @@ class WorldRenderer {
         return this.getGridPosition(x, y);
     }
 
-    // Create semi-transparent preview mesh with optional red border for invalid placement
-    createPreviewMesh(q, r, groundTypes, isInvalid = false, validationResults = null) {
+    // Create semi-transparent preview mesh
+    createPreviewMesh(q, r, groundTypes) {
         console.log('[WorldRenderer] Creating preview mesh with debug mode:', window.DEBUG_MODE);
         
         // Remove existing preview mesh but keep debug markers
@@ -154,13 +155,6 @@ class WorldRenderer {
                 const material = child.material.clone();
                 material.transparent = true;
                 material.opacity = 0.5;
-
-                if (isInvalid) {
-                    material.emissive = new THREE.Color(0xff0000);
-                    material.emissiveIntensity = 0.8;
-                    material.emissiveMap = null;
-                }
-
                 child.material = material;
             }
         });
@@ -168,14 +162,14 @@ class WorldRenderer {
         this.previewMesh = mesh;
         this.scene.add(mesh);
 
-        // Add or update debug markers if debug mode is enabled
+        // Add debug markers if debug mode is enabled
         if (window.DEBUG_MODE) {
             console.log('[WorldRenderer] Debug mode active, adding markers');
             
             // Clear existing markers
             this.clearDebugMarkers();
 
-            // Add test marker at preview mesh position
+            // Add center marker at preview mesh position
             const centerMarker = new THREE.Mesh(
                 new THREE.BoxGeometry(0.5, 2, 0.5),
                 new THREE.MeshBasicMaterial({ color: 0xffff00 })
@@ -188,42 +182,30 @@ class WorldRenderer {
                 console.log(`[WorldRenderer] Added center marker at`, centerMarker.position);
             }
             
-            if (validationResults && validationResults.corners) {
-                console.log('[WorldRenderer] Adding corner markers:', validationResults.corners);
-                
-                validationResults.corners.forEach((corner, index) => {
-                    // Create marker box (using box instead of sphere for better visibility)
-                    const markerGeometry = new THREE.BoxGeometry(0.4, 2, 0.4);
-                    const markerMaterial = new THREE.MeshBasicMaterial({
-                        color: corner.valid ? 0x00ff00 : 0xff0000,
-                        transparent: false // Make fully opaque
-                    });
-                    const marker = new THREE.Mesh(markerGeometry, markerMaterial);
-                    marker.position.set(corner.x, 1, corner.z);
-                    this.debugMarkers.add(marker);
-                    console.log(`[WorldRenderer] Added corner marker ${index} at (${corner.x}, 1, ${corner.z})`);
-
-                    // Create text label
-                    if (corner.existing) {
-                        const text = `Corner ${index}\nCurrent: ${corner.existing.join(',')}\nNew: ${corner.groundType}`;
-                        const sprite = this.createTextSprite(text, corner.valid ? '#00ff00' : '#ff0000');
-                        sprite.position.set(corner.x, 2.5, corner.z);
-                        this.debugMarkers.add(sprite);
-                    }
+            // Add corner markers for the triangle
+            const cornerPositions = this.mapSystem.calculateCornerPositions(q, r);
+            cornerPositions.forEach((corner, index) => {
+                // Create marker box
+                const markerGeometry = new THREE.BoxGeometry(0.4, 2, 0.4);
+                const markerMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x00ff00,
+                    transparent: false
                 });
-            }
+                const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+                marker.position.set(corner.x, 1, corner.z);
+                this.debugMarkers.add(marker);
+                console.log(`[WorldRenderer] Added corner marker ${index} at (${corner.x}, 1, ${corner.z})`);
 
-            // Clear any existing timeout
-            if (this.debugMarkersTimeout) {
-                clearTimeout(this.debugMarkersTimeout);
-            }
-
-            // Set timeout to clear markers after 10 seconds
-            this.debugMarkersTimeout = setTimeout(() => {
-                console.log('[WorldRenderer] Clearing debug markers after timeout');
-                this.clearDebugMarkers();
-            }, 10000);
+                // Create text label for corner position
+                const label = this.createTextSprite(
+                    `Corner ${index}\n(${corner.x.toFixed(1)}, ${corner.z.toFixed(1)})`
+                );
+                label.position.set(corner.x, 2, corner.z);
+                this.debugMarkers.add(label);
+            });
         }
+
+        return mesh;
     }
 
     clearDebugMarkers() {
@@ -346,16 +328,11 @@ class WorldRenderer {
     }
 
     showPreviewTriangle(q, r, groundTypes) {
-        // Check if position is valid for placement
-        const validationResults = this.mapSystem.canAddTriangle(q, r, groundTypes);
-        
-        this.createPreviewMesh(
-            q, 
-            r, 
-            groundTypes, 
-            !validationResults.valid,
-            validationResults
-        );
+        this.createPreviewMesh(q, r, groundTypes);
+    }
+
+    getGroundTypeColor(groundType) {
+        return getGroundTypeColor(groundType);
     }
 }
 

@@ -1,15 +1,8 @@
 import * as THREE from 'three';
+import { GROUND_TYPES } from '@shared/world/groundTypes.js';
 
 class GridTriangleRenderer {
     constructor() {
-        // Ground type colors
-        this.groundTypeColors = {
-            GRASS: 0x90EE90,    // Light green
-            WATER: 0x4169E1,    // Royal blue
-            SAND: 0xF4A460,     // Sandy brown
-            ROCK: 0x808080      // Gray
-        };
-
         // Cache for materials to avoid recreating them
         this.materialCache = new Map();
     }
@@ -26,6 +19,11 @@ class GridTriangleRenderer {
             this.materialCache.set(color, material);
         }
         return this.materialCache.get(color);
+    }
+
+    // Get color for a ground type
+    getGroundTypeColor(groundType) {
+        return GROUND_TYPES[groundType]?.color ?? 0xFF0000; // Default to red if type not found
     }
 
     // Calculate triangle vertices based on position and orientation
@@ -97,7 +95,7 @@ class GridTriangleRenderer {
         triangleShape.lineTo(geometry.vertices[0].x, geometry.vertices[0].y);
 
         const triangleGeometry = new THREE.ShapeGeometry(triangleShape);
-        const triangleMaterial = this.getMaterial(this.groundTypeColors[groundTypes[0]]);
+        const triangleMaterial = this.getMaterial(this.getGroundTypeColor(groundTypes[0]));
         const triangleMesh = new THREE.Mesh(triangleGeometry, triangleMaterial);
         triangleMesh.rotation.x = -Math.PI / 2;
         triangleMesh.position.y = 0;
@@ -116,19 +114,19 @@ class GridTriangleRenderer {
             let groundTypeIndex;
             if (isUpward) {
                 switch(index) {
-                    case 0: groundTypeIndex = 1; break; // Bottom-Left -> left
-                    case 1: groundTypeIndex = 2; break; // Bottom-Right -> right
-                    case 2: groundTypeIndex = 3; break; // Top -> top/bottom
+                    case 0: groundTypeIndex = 3; break; // Bottom-Left -> bottom left
+                    case 1: groundTypeIndex = 2; break; // Bottom-Right -> bottom right
+                    case 2: groundTypeIndex = 1; break; // Top -> top
                 }
             } else {
                 switch(index) {
-                    case 0: groundTypeIndex = 2; break; // Top-Left -> right
-                    case 1: groundTypeIndex = 1; break; // Top-Right -> left
-                    case 2: groundTypeIndex = 3; break; // Bottom -> top/bottom
+                    case 0: groundTypeIndex = 1; break; // Top-Left -> top left
+                    case 1: groundTypeIndex = 2; break; // Top-Right -> top right
+                    case 2: groundTypeIndex = 3; break; // Bottom -> bottom
                 }
             }
             
-            const arcMaterial = this.getMaterial(this.groundTypeColors[groundTypes[groundTypeIndex]]);
+            const arcMaterial = this.getMaterial(this.getGroundTypeColor(groundTypes[groundTypeIndex]));
             const arc = new THREE.Mesh(arcGeometry, arcMaterial);
             
             // Position arc with offset to ensure proper connection
