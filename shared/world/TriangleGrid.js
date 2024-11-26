@@ -17,22 +17,23 @@ export class TriangleGrid {
         const isUpward = (q + r) % 2 === 0;
         
         // Calculate center of the triangle
-        const centerX = q * size * 2;
-        const centerY = r * h/2; // Halved the y-spacing
+        const centerX = q * size// * 1; // Reduced from 2 to 1.5 to bring triangles closer horizontally
+        const centerY = r * h //* 1.1; // Adjusted from h/2 to h*0.4 to reduce vertical spacing
         
         // Calculate vertices
         let vertices;
+        const vert_offset=.1667*h;
         if (isUpward) {
             vertices = [
-                { x: centerX - size, y: centerY - h/3 },     // Bottom left
-                { x: centerX + size, y: centerY - h/3 },     // Bottom right
-                { x: centerX, y: centerY + 2*h/3 }           // Top
+                { x: centerX - size, y: centerY - h/3 -vert_offset},     // Bottom left
+                { x: centerX + size, y: centerY - h/3 -vert_offset},     // Bottom right
+                { x: centerX, y: centerY + 2*h/3-vert_offset }           // Top
             ];
         } else {
             vertices = [
-                { x: centerX - size, y: centerY + h/3 },     // Top left
-                { x: centerX + size, y: centerY + h/3 },     // Top right
-                { x: centerX, y: centerY - 2*h/3 }           // Bottom
+                { x: centerX - size, y: centerY + h/3  +vert_offset},     // Top left
+                { x: centerX + size, y: centerY + h/3 +vert_offset },     // Top right
+                { x: centerX, y: centerY - 2*h/3 +vert_offset }           // Bottom
             ];
         }
 
