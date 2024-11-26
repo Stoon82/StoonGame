@@ -38,6 +38,11 @@
 - [ ] Climate system affecting ground types
 
 ### 🎮 Gameplay Elements
+- [ ] Initial hexagon setup with six triangles
+- [ ] Triangle matching interface
+- [ ] Click-to-place triangle mechanics
+- [ ] Valid placement verification
+- [ ] Random triangle generation with matching rules
 - [ ] Entity system for game objects
 - [ ] Player character implementation
 - [ ] Movement system on triangle grid
@@ -76,9 +81,10 @@
 ## 📅 Development Priorities
 
 ### Immediate Focus (Current Sprint)
-1. Refine terrain generation algorithm
-2. Implement basic entity system
-3. Add player character and movement
+1. Implement hexagonal starting layout
+2. Create triangle matching system
+3. Add placement verification logic
+4. Build triangle preview interface
 
 ### Short Term (Next 2-3 Sprints)
 1. Basic resource gathering

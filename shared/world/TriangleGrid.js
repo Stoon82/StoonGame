@@ -1,29 +1,44 @@
 // Coordinate system for triangular grid
 // Using axial coordinates (q,r) which is a common system for hexagonal/triangular grids
-export class TriangleGrid {
+class TriangleGrid {
     constructor(width = 10, height = 10) {
         console.log(`Creating grid with dimensions: ${width}x${height}`);
         this.width = width;
         this.height = height;
-        this.triangles = new Map(); // Store triangle data with coordinates as keys
+        this.triangles = new Map(); // Store only placed triangles
         this.size = 1; // Base size of triangles
-        
-        // Initialize all triangles
-        for (let q = 0; q < width; q++) {
-            for (let r = 0; r < height; r++) {
-                const key = this.coordToKey(q, r);
-                this.triangles.set(key, {
-                    q, r,
-                    isUpward: (q + r) % 2 === 0
-                });
-            }
-        }
-        console.log(`Grid initialized with ${this.triangles.size} triangles`);
     }
 
     // Convert axial coordinates to a string key
     coordToKey(q, r) {
         return `${q},${r}`;
+    }
+
+    // Add a triangle to the grid
+    addTriangle(q, r, data) {
+        const key = this.coordToKey(q, r);
+        this.triangles.set(key, {
+            ...data,
+            q, r,
+            isUpward: (q + r) % 2 === 0
+        });
+        console.log(`Added triangle at ${key}`);
+        console.log('Current triangles:', Array.from(this.triangles.keys()));
+    }
+
+    // Check if a triangle exists at coordinates
+    hasTriangle(q, r) {
+        return this.triangles.has(this.coordToKey(q, r));
+    }
+
+    // Get triangle data at coordinates
+    getTriangle(q, r) {
+        return this.triangles.get(this.coordToKey(q, r));
+    }
+
+    // Clear all triangles
+    clear() {
+        this.triangles.clear();
     }
 
     // Get the vertices and arc centers of a triangle at given coordinates
@@ -83,6 +98,49 @@ export class TriangleGrid {
         return { x, z };
     }
 
+    // Get distance between two grid positions
+    getGridDistance(q1, r1, q2, r2) {
+        const dq = Math.abs(q1 - q2);
+        const dr = Math.abs(r1 - r2);
+        return Math.max(dq, dr);
+    }
+
+    // Get triangles within grid distance
+    getTrianglesInRange(q, r, range) {
+        const nearbyTriangles = [];
+        
+        for (const [key, triangle] of this.triangles.entries()) {
+            const distance = this.getGridDistance(q, r, triangle.q, triangle.r);
+            if (distance <= range) {
+                nearbyTriangles.push(triangle);
+            }
+        }
+        
+        return nearbyTriangles;
+    }
+
+    // Get world positions of triangle corners
+    getCornerWorldPositions(q, r) {
+        const size = this.size;
+        const h = size * Math.sqrt(3);
+        const isUpward = (q + r) % 2 === 0;
+        const basePos = this.getWorldPosition(q, r);
+        
+        if (isUpward) {
+            return [
+                { x: basePos.x - size/2, z: basePos.z - h/3 },     // Bottom left
+                { x: basePos.x + size/2, z: basePos.z - h/3 },     // Bottom right
+                { x: basePos.x, z: basePos.z + 2*h/3 }             // Top
+            ];
+        } else {
+            return [
+                { x: basePos.x - size/2, z: basePos.z + h/3 },     // Top left
+                { x: basePos.x + size/2, z: basePos.z + h/3 },     // Top right
+                { x: basePos.x, z: basePos.z - 2*h/3 }             // Bottom
+            ];
+        }
+    }
+
     // Get neighboring positions for a given coordinate
     getNeighbors(q, r) {
         const neighbors = [];
@@ -112,7 +170,4 @@ export class TriangleGrid {
     }
 }
 
-// Handle both ES modules and CommonJS
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = TriangleGrid;
-}
+export default TriangleGrid;

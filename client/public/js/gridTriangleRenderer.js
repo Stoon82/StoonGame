@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export class GridTriangleRenderer {
+class GridTriangleRenderer {
     constructor() {
         // Ground type colors
         this.groundTypeColors = {
@@ -137,3 +137,5 @@ export class GridTriangleRenderer {
         this.materialCache.clear();
     }
 }
+
+export default GridTriangleRenderer;

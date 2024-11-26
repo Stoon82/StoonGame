@@ -1,165 +1,175 @@
-import { WorldRenderer } from './worldRenderer.js';
-import { TriangleGrid } from '../../../shared/world/TriangleGrid.js';
-import { Stoonie } from '../../../shared/entities/Stoonie.js';
-import { StoonieManager } from '../../../shared/entities/StoonieManager.js';
-import { SoulManager } from '../../../shared/entities/SoulManager.js';
+import WorldRenderer from './worldRenderer.js';
+import TriangleGrid from '../../../shared/world/TriangleGrid.js';
+
+console.log('Initializing game...');
 
 class Game {
     constructor() {
-        // Create game container
-        this.container = document.getElementById('game-container');
-        if (!this.container) {
-            console.error('Game container not found, creating one...');
-            this.container = document.createElement('div');
-            this.container.id = 'game-container';
-            this.container.style.width = '100vw';
-            this.container.style.height = '100vh';
-            this.container.style.position = 'relative';
-            document.body.appendChild(this.container);
-        }
-        
-        console.log('Initializing game with container:', this.container);
-        
-        // Initialize renderer
-        this.renderer = new WorldRenderer(this.container);
-        this.grid = null;
-        this.stoonieManager = new StoonieManager();
-        this.soulManager = new SoulManager(3); // Start with 3 max souls
-        this.lastUpdate = Date.now();
-        
-        this.setupUI();
-        this.gameLoop();
-        
-        // Generate initial world
-        console.log('Generating initial world...');
-        this.generateWorld();
-    }
+        this.canvas = document.getElementById('gameCanvas');
+        this.previewCanvas = document.getElementById('previewCanvas');
+        this.previewCanvas.width = 200;
+        this.previewCanvas.height = 200;
 
-    setupUI() {
-        const controls = document.createElement('div');
-        controls.style.position = 'fixed';
-        controls.style.top = '10px';
-        controls.style.left = '10px';
-        controls.style.zIndex = '100';
-        controls.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-        controls.style.padding = '10px';
-        controls.style.borderRadius = '5px';
-        controls.style.color = 'white';
-        controls.style.display = 'flex';
-        controls.style.flexDirection = 'column';
-        controls.style.gap = '10px';
-
-        // Generate World button
-        const generateButton = document.createElement('button');
-        generateButton.textContent = 'Generate World';
-        generateButton.addEventListener('click', () => {
-            console.log('Generating world...');
-            this.generateWorld();
-        });
-        controls.appendChild(generateButton);
-
-        // Width control
-        const widthDiv = document.createElement('div');
-        widthDiv.innerHTML = 'Width: <span id="widthValue">5</span>';
-        const widthSlider = document.createElement('input');
-        widthSlider.type = 'range';
-        widthSlider.min = '1';
-        widthSlider.max = '20';
-        widthSlider.value = '5';
-        widthSlider.addEventListener('input', () => {
-            document.getElementById('widthValue').textContent = widthSlider.value;
-        });
-        widthDiv.appendChild(widthSlider);
-        controls.appendChild(widthDiv);
-
-        // Height control
-        const heightDiv = document.createElement('div');
-        heightDiv.innerHTML = 'Height: <span id="heightValue">5</span>';
-        const heightSlider = document.createElement('input');
-        heightSlider.type = 'range';
-        heightSlider.min = '1';
-        heightSlider.max = '20';
-        heightSlider.value = '5';
-        heightSlider.addEventListener('input', () => {
-            document.getElementById('heightValue').textContent = heightSlider.value;
-        });
-        heightDiv.appendChild(heightSlider);
-        controls.appendChild(heightDiv);
-
-        // Add Stoonie button
-        const addStoonieButton = document.createElement('button');
-        addStoonieButton.textContent = 'Add Stoonie';
-        addStoonieButton.addEventListener('click', () => {
-            console.log('Adding Stoonie...');
-            this.addRandomStoonie();
-        });
-        controls.appendChild(addStoonieButton);
-
-        // Add controls to container
-        this.container.appendChild(controls);
-    }
-
-    generateWorld() {
-        const width = parseInt(document.getElementById('widthValue').textContent);
-        const height = parseInt(document.getElementById('heightValue').textContent);
-        
-        // Clear existing Stoonies when generating new world
-        this.stoonieManager = new StoonieManager();
-        
-        this.grid = new TriangleGrid(width, height);
-        this.renderer.generateWorld(width, height);
-    }
-
-    addRandomStoonie() {
-        if (!this.grid) {
-            console.warn('Please generate a world first!');
+        if (!this.canvas || !this.previewCanvas) {
+            console.error('Canvas elements not found!');
             return;
         }
 
-        // Random position within grid bounds
-        const q = Math.floor(Math.random() * this.grid.width);
-        const r = Math.floor(Math.random() * this.grid.height);
+        // Initialize renderers
+        this.renderer = new WorldRenderer(this.canvas);
+        this.previewRenderer = new WorldRenderer(this.previewCanvas, true);
+        this.grid = new TriangleGrid();
         
-        // Random gender
-        const gender = Math.random() < 0.5 ? 'male' : 'female';
+        // Set up controls
+        this.setupControls();
         
-        // Create new Stoonie with position and gender
-        const stoonie = new Stoonie(
-            crypto.randomUUID(),
-            { q, r },
-            gender
-        );
+        // Generate initial world
+        this.generateNewWorld();
         
-        this.stoonieManager.addStoonie(stoonie);
-        
-        // Immediately update renderer
-        this.renderer.updateStoonies(this.stoonieManager.getStoonies());
+        // Start animation loop
+        this.animate();
     }
 
-    gameLoop() {
-        const now = Date.now();
-        const deltaTime = (now - this.lastUpdate) / 1000;
-        this.lastUpdate = now;
+    setupControls() {
+        const newWorldBtn = document.getElementById('newWorldBtn');
+        if (newWorldBtn) {
+            newWorldBtn.addEventListener('click', () => this.generateNewWorld());
+        }
 
-        // Update all Stoonies
-        this.stoonieManager.update(deltaTime);
+        // Setup click handler for placing triangles
+        this.canvas.addEventListener('click', (event) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            this.handleCanvasClick(x, y);
+        });
+
+        // Setup mousemove handler for preview
+        this.canvas.addEventListener('mousemove', (event) => {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            this.handleMouseMove(x, y);
+        });
+
+        // Remove preview when mouse leaves canvas
+        this.canvas.addEventListener('mouseleave', () => {
+            this.renderer.removePreviewMesh();
+        });
+    }
+
+    generateNewWorld() {
+        console.log('Generating new world...');
+        this.renderer.clear();
+        this.grid.clear();
         
-        // Update renderer with latest Stoonie positions
-        this.renderer.updateStoonies(this.stoonieManager.getStoonies());
+        // Create initial hexagon with 6 triangles
+        const initialTriangles = [
+            { q: 0, r: 0 },      // Bottom-Center
+            { q: -1, r: 0 },     // Bottom-Left
+            { q: -1, r: 1 },     // Top-Left
+            { q: 0, r: 1 },      // Top-Center
+            { q: 1, r: 1 },      // Top-Right
+            { q: 1, r: 0 }       // Bottom-Right
+        ];
 
-        // Continue the game loop
-        requestAnimationFrame(() => this.gameLoop());
+        initialTriangles.forEach(pos => {
+            const groundTypes = this.generateRandomGroundTypes();
+            this.renderer.renderTriangle(pos.q, pos.r, groundTypes);
+            this.grid.addTriangle(pos.q, pos.r, { groundTypes });
+        });
+
+        // Generate new preview triangle
+        this.generateNewPreviewTriangle();
+    }
+
+    generateRandomGroundTypes() {
+        const types = ['GRASS', 'WATER', 'SAND', 'ROCK'];
+        return [
+            types[Math.floor(Math.random() * types.length)], // Center
+            types[Math.floor(Math.random() * types.length)], // Left arc
+            types[Math.floor(Math.random() * types.length)], // Right arc
+            types[Math.floor(Math.random() * types.length)]  // Top/Bottom arc
+        ];
+    }
+
+    generateNewPreviewTriangle() {
+        const groundTypes = this.generateRandomGroundTypes();
+        
+        // Clear previous preview
+        this.previewRenderer.clear();
+        
+        // Render preview triangle at center of preview canvas
+        this.previewRenderer.renderTriangle(0, 0, groundTypes);
+        
+        // Store current preview ground types
+        this.currentPreviewGroundTypes = groundTypes;
+    }
+
+    isPositionInRange(q, r) {
+        const gridRange = 1; // Only check immediate neighbors
+        const nearbyTriangles = this.grid.getTrianglesInRange(q, r, gridRange);
+        return nearbyTriangles.length > 0;
+    }
+
+    handleCanvasClick(x, y) {
+        const gridPos = this.renderer.getGridPosition(x, y);
+        if (!gridPos) return;
+
+        // Check if the position already has a triangle
+        if (this.grid.hasTriangle(gridPos.q, gridPos.r)) {
+            console.log(`Position ${gridPos.q},${gridPos.r} already occupied`);
+            return;
+        }
+
+        // Check if we're close enough to an existing triangle
+        if (!this.isPositionInRange(gridPos.q, gridPos.r)) {
+            console.log(`Position ${gridPos.q},${gridPos.r} not in range of existing triangles`);
+            return;
+        }
+
+        console.log(`Placing triangle at ${gridPos.q},${gridPos.r}`);
+
+        // Place the triangle
+        this.renderer.renderTriangle(gridPos.q, gridPos.r, this.currentPreviewGroundTypes);
+        this.grid.addTriangle(gridPos.q, gridPos.r, { groundTypes: this.currentPreviewGroundTypes });
+
+        // Generate new preview triangle
+        this.generateNewPreviewTriangle();
+    }
+
+    handleMouseMove(x, y) {
+        const gridPos = this.renderer.getGridPosition(x, y);
+        if (!gridPos) {
+            this.renderer.removePreviewMesh();
+            return;
+        }
+
+        // Check if position is valid for placement
+        if (this.grid.hasTriangle(gridPos.q, gridPos.r)) {
+            this.renderer.removePreviewMesh();
+            return;
+        }
+
+        // Show preview if we're close enough to an existing triangle
+        if (this.isPositionInRange(gridPos.q, gridPos.r)) {
+            this.renderer.createPreviewMesh(gridPos.q, gridPos.r, this.currentPreviewGroundTypes);
+        } else {
+            this.renderer.removePreviewMesh();
+        }
+    }
+
+    animate() {
+        requestAnimationFrame(() => this.animate());
+        this.renderer.render();
+        this.previewRenderer.render();
     }
 }
 
-// Initialize game instance
-let game = null;
-
 // Start the game when the page loads
-window.addEventListener('DOMContentLoaded', () => {
-    console.log('Initializing game...');
+document.addEventListener('DOMContentLoaded', () => {
     try {
-        game = new Game();
+        window.game = new Game();
         console.log('Game initialized successfully');
     } catch (error) {
         console.error('Error initializing game:', error);
