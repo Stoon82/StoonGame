@@ -1,11 +1,16 @@
-const fs = require('fs').promises;
-const path = require('path');
-const PlayerData = require('../models/PlayerData');
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import fs from 'fs/promises';
+import PlayerData from '../models/PlayerData.js';
+import { GROUND_TYPES } from '../../shared/world/groundTypes.js';
 
-class PlayerManager {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+export class PlayerManager {
     constructor() {
         this.activePlayers = new Map();
-        this.playersDir = path.join(__dirname, '..', 'maps', 'players');
+        this.playersDir = join(__dirname, '..', 'maps', 'players');
         this.ensureDirectory();
     }
 
@@ -27,7 +32,7 @@ class PlayerManager {
     }
 
     async loadPlayer(playerId) {
-        const filePath = path.join(this.playersDir, `${playerId}.json`);
+        const filePath = join(this.playersDir, `${playerId}.json`);
         try {
             const data = await fs.readFile(filePath, 'utf8');
             return JSON.parse(data);
@@ -44,7 +49,7 @@ class PlayerManager {
 
     async savePlayer(playerId, playerData) {
         try {
-            const filePath = path.join(this.playersDir, `${playerId}.json`);
+            const filePath = join(this.playersDir, `${playerId}.json`);
             await fs.writeFile(filePath, JSON.stringify(playerData.toJSON(), null, 2));
             return true;
         } catch (error) {
@@ -115,4 +120,4 @@ class PlayerManager {
     }
 }
 
-module.exports = new PlayerManager();
+export default new PlayerManager();

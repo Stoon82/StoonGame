@@ -1,4 +1,4 @@
-class PlayerData {
+export class PlayerData {
     constructor({
         id,
         username,
@@ -46,3 +46,5 @@ class PlayerData {
         return new PlayerData(json);
     }
 }
+
+export default PlayerData;

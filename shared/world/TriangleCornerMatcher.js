@@ -1,4 +1,6 @@
 // Class dedicated to handling triangle corner matching logic
+import { GROUND_TYPE_IDS } from '../config/groundTypes.js';
+
 class TriangleCornerMatcher {
     constructor() {
         // Map of corner indices to their names for each orientation
@@ -213,9 +215,8 @@ class TriangleCornerMatcher {
     // Get ground types that would match with neighbors
     getMatchingGroundTypes(grid, q, r) {
         const orientation = this.getTriangleOrientation(q, r);
-        const groundTypes = ['GRASS', 'WATER', 'SAND', 'ROCK'];
         let result = [
-            groundTypes[Math.floor(Math.random() * groundTypes.length)], // Center
+            GROUND_TYPE_IDS[Math.floor(Math.random() * GROUND_TYPE_IDS.length)], // Center
             null, // Left
             null, // Right
             null  // Top/Bottom
@@ -244,7 +245,7 @@ class TriangleCornerMatcher {
         // Fill in any remaining null ground types with random values
         for (let i = 0; i < result.length; i++) {
             if (result[i] === null) {
-                result[i] = groundTypes[Math.floor(Math.random() * groundTypes.length)];
+                result[i] = GROUND_TYPE_IDS[Math.floor(Math.random() * GROUND_TYPE_IDS.length)];
             }
         }
 

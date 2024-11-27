@@ -1,4 +1,6 @@
 // UUID generation for browser and Node.js environments
+import crypto from 'crypto';
+
 const generateUUID = () => {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         return crypto.randomUUID();
@@ -12,8 +14,9 @@ const generateUUID = () => {
 };
 
 import * as THREE from 'three';
+import { GROUND_TYPES } from '../config/groundTypes.js';
 
-export class Stoonie {
+class Stoonie {
     constructor(gender = Math.random() < 0.5 ? 'male' : 'female', scene = null) {
         // Basic attributes
         this.id = generateUUID();
@@ -43,10 +46,11 @@ export class Stoonie {
         
         // Ground type movement modifiers
         this.groundSpeedModifiers = {
-            grass: 1.5,    // Fast on grass
-            sand: 0.6,     // Slow on sand
-            water: 0.0,    // Can't move on water
-            rock: 1.0      // Normal speed on rock
+            [GROUND_TYPES.GRASS.id]: 1.5,    // Fast on grass
+            [GROUND_TYPES.SAND.id]: 0.6,     // Slow on sand
+            [GROUND_TYPES.WATER.id]: 0.0,    // Can't move on water
+            [GROUND_TYPES.ROCK.id]: 1.0,     // Normal speed on rock
+            [GROUND_TYPES.WOODS.id]: 0.8     // Slightly slower in woods
         };
 
         // Current ground info
@@ -137,10 +141,11 @@ export class Stoonie {
         if (!groundType) return 0xff0000; // Red for null/undefined
         
         const colors = {
-            grass: 0x00ff00,  // Bright green
-            sand: 0xffff00,   // Yellow
-            water: 0x0000ff,  // Blue
-            rock: 0x808080    // Gray
+            [GROUND_TYPES.GRASS.id]: 0x00ff00,  // Bright green
+            [GROUND_TYPES.SAND.id]: 0xffff00,   // Yellow
+            [GROUND_TYPES.WATER.id]: 0x0000ff,  // Blue
+            [GROUND_TYPES.ROCK.id]: 0x808080,   // Gray
+            [GROUND_TYPES.WOODS.id]: 0x008000   // Dark green
         };
         
         return colors[groundType] || 0xff0000; // Red for unknown types
@@ -161,7 +166,7 @@ export class Stoonie {
         }
         
         // Don't die on invalid ground, just try to move somewhere else
-        if (!this.currentGroundType || this.currentGroundType === 'water') {
+        if (!this.currentGroundType || this.currentGroundType === GROUND_TYPES.WATER.id) {
             console.log(`[Stoonie ${this.id}] On invalid ground (${this.currentGroundType}), trying to move`);
             this.moveProgress = 1;  // Force new move next update
             this.delayTimer = this.moveDelay;
@@ -222,7 +227,7 @@ export class Stoonie {
                     this.showGroundCheck(newX, newZ, newPosGroundType, grid.scene);
                 }
                 
-                if (!newPosGroundType || newPosGroundType === 'water') {
+                if (!newPosGroundType || newPosGroundType === GROUND_TYPES.WATER.id) {
                     console.log(`[Stoonie ${this.id}] Invalid position detected during movement (${newPosGroundType}), finding new direction`);
                     // Cancel current move and try a new direction immediately
                     this.moveProgress = 1;
@@ -265,7 +270,7 @@ export class Stoonie {
 
         // Double check current position is valid
         const currentGroundType = mapSystem.getGroundTypeAtPosition(this.worldX, this.worldZ);
-        if (!currentGroundType || currentGroundType === 'water') {
+        if (!currentGroundType || currentGroundType === GROUND_TYPES.WATER.id) {
             console.error(`[Stoonie ${this.id}] Currently on invalid ground (${currentGroundType})`);
             return;
         }
@@ -283,7 +288,7 @@ export class Stoonie {
 
             // Check ground type at target center
             const targetGroundType = mapSystem.getGroundTypeAtPosition(targetWorldPos.x, targetWorldPos.z);
-            if (!targetGroundType || targetGroundType === 'water') {
+            if (!targetGroundType || targetGroundType === GROUND_TYPES.WATER.id) {
                 console.log(`[Stoonie ${this.id}] Skipping invalid neighbor (${targetPos.q}, ${targetPos.r}): ${targetGroundType}`);
                 continue;
             }
@@ -305,7 +310,7 @@ export class Stoonie {
                     targetWorldPos.z + testOffsetZ
                 );
 
-                if (offsetGroundType && offsetGroundType !== 'water') {
+                if (offsetGroundType && offsetGroundType !== GROUND_TYPES.WATER.id) {
                     validOffset = true;
                     offsetX = testOffsetX;
                     offsetZ = testOffsetZ;
@@ -321,7 +326,7 @@ export class Stoonie {
             
             // Final validation of target position
             const finalGroundType = mapSystem.getGroundTypeAtPosition(this.targetWorldX, this.targetWorldZ);
-            if (!finalGroundType || finalGroundType === 'water') {
+            if (!finalGroundType || finalGroundType === GROUND_TYPES.WATER.id) {
                 console.log(`[Stoonie ${this.id}] Final position check failed: ${finalGroundType}`);
                 continue;
             }
@@ -344,7 +349,7 @@ export class Stoonie {
             this.moveTimer = 0;
 
             // Apply energy cost for movement (higher cost on sand)
-            const energyCost = finalGroundType === 'sand' ? 3 : 2;
+            const energyCost = finalGroundType === GROUND_TYPES.SAND.id ? 3 : 2;
             this.needs.energy = Math.max(0, this.needs.energy - energyCost);
 
             console.log(`[Stoonie ${this.id}] Moving to (${targetPos.q}, ${targetPos.r}) on ${finalGroundType}`);
@@ -549,3 +554,5 @@ export class Stoonie {
         }
     }
 }
+
+export default Stoonie;

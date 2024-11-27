@@ -1,4 +1,4 @@
-class EdgeElement {
+export class EdgeElement {
     constructor(type, startPoint, endPoint) {
         this.id = crypto.randomUUID();
         this.type = type; // 'street' or 'river'
@@ -8,7 +8,7 @@ class EdgeElement {
     }
 }
 
-export default class EdgeSystem {
+export class EdgeSystem {
     constructor() {
         this.edges = new Map(); // key: "x1,y1-x2,y2", value: EdgeElement
         this.bridges = new Map(); // key: "x,y" (corner point), value: { id, connects: ['edge1Id', 'edge2Id'] }
@@ -140,4 +140,4 @@ export default class EdgeSystem {
     }
 }
 
-export { EdgeElement };
+export default EdgeSystem;

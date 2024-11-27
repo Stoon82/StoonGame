@@ -2,6 +2,7 @@ import WorldRenderer from './worldRenderer.js';
 import TriangleMapSystem from '@shared/world/TriangleMapSystem.js';
 import { StoonieManager } from '@shared/entities/StoonieManager.js';
 import { getRandomGroundType } from '@shared/world/groundTypes.js';
+import { GROUND_TYPES } from '@shared/config/groundTypes.js';
 import { io } from 'socket.io-client';
 import BuildingSystem from './buildingSystem.js';
 import EdgeSystem from '@shared/world/EdgeSystem.js';
@@ -564,11 +565,12 @@ class Game {
         if (!groundType) return '#ff0000';  
         
         const groundTypeColors = {
-            'grass': '#90EE90',  
-            'water': '#4169E1',  
-            'sand': '#F4A460',   
-            'rock': '#808080',   
-            'unknown': '#ff0000' 
+            [GROUND_TYPES.GRASS.id]: '#90EE90',  
+            [GROUND_TYPES.WATER.id]: '#4169E1',  
+            [GROUND_TYPES.SAND.id]: '#F4A460',   
+            [GROUND_TYPES.ROCK.id]: '#808080',   
+            [GROUND_TYPES.WOODS.id]: '#006400',
+            'unknown': '#ff0000'
         };
         
         return groundTypeColors[groundType.toLowerCase()] || groundTypeColors.unknown;

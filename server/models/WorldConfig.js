@@ -1,4 +1,6 @@
-class WorldConfig {
+import { GROUND_TYPE_IDS } from '../../shared/world/groundTypes.js';
+
+export class WorldConfig {
     constructor({
         name = 'New World',
         seed = Math.random().toString(36).substring(7),
@@ -8,7 +10,7 @@ class WorldConfig {
         mapParameters = {
             initialSize: 1,
             maxSize: 100,
-            groundTypes: ['GRASS', 'WATER', 'SAND', 'ROCK'],
+            groundTypes: GROUND_TYPE_IDS,
             allowDiagonalConnections: true
         }
     } = {}) {
@@ -41,3 +43,5 @@ class WorldConfig {
         return config;
     }
 }
+
+export default WorldConfig;

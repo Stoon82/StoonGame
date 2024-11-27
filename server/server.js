@@ -1,10 +1,15 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
-const cors = require('cors');
-const WorldManager = require('./services/WorldManager');
-const PlayerManager = require('./services/PlayerManager');
+import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import cors from 'cors';
+import WorldManager from './services/WorldManager.js';
+import PlayerManager from './services/PlayerManager.js';
+import { GROUND_TYPES } from '../shared/world/groundTypes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
@@ -62,7 +67,7 @@ async function initializeDefaultWorld() {
             const centerPoint = {
                 worldPos: { x: 0, y: 0, z: 0 },
                 gridPos: { q: 0, r: 0 },
-                groundType: 'GRASS'
+                groundType: GROUND_TYPES.GRASS.id
             };
 
             // Calculate corner points based on center (0,0,0)
@@ -76,21 +81,21 @@ async function initializeDefaultWorld() {
             cornerPoints[`${-size},${-h/3 - ver_offset}`] = {
                 worldPos: { x: -size, y: 0, z: -h/3 - ver_offset },
                 gridPos: { q: -1, r: 0 },
-                groundType: 'GRASS'
+                groundType: GROUND_TYPES.GRASS.id
             };
 
             // Bottom right corner
             cornerPoints[`${size},${-h/3 - ver_offset}`] = {
                 worldPos: { x: size, y: 0, z: -h/3 - ver_offset },
                 gridPos: { q: 1, r: 0 },
-                groundType: 'GRASS'
+                groundType: GROUND_TYPES.GRASS.id
             };
 
             // Top corner
             cornerPoints[`0,${2*h/3 - ver_offset}`] = {
                 worldPos: { x: 0, y: 0, z: 2*h/3 - ver_offset },
                 gridPos: { q: 0, r: 1 },
-                groundType: 'GRASS'
+                groundType: GROUND_TYPES.GRASS.id
             };
 
             defaultWorld = {

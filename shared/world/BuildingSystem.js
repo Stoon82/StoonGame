@@ -1,4 +1,4 @@
-class Building {
+export class Building {
     constructor(type, size, position) {
         this.type = type;
         this.size = size;
@@ -7,7 +7,7 @@ class Building {
     }
 }
 
-class BuildingSystem {
+export class BuildingSystem {
     constructor() {
         this.buildings = new Map();
         this.buildingTypes = {
@@ -77,6 +77,4 @@ class BuildingSystem {
     }
 }
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { Building, BuildingSystem };
-}
+export { Building, BuildingSystem };

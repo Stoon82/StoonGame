@@ -15,6 +15,10 @@ export const GROUND_TYPES = {
     ROCK: {
         id: 'ROCK',
         color: 0x808080  // Gray
+    },
+    WOODS: {
+        id: 'WOODS',
+        color: 0x006400  // Dark green
     }
 };
 

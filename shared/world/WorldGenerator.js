@@ -1,9 +1,20 @@
 import TriangleMapSystem from './TriangleMapSystem.js';
+import { GROUND_TYPES, GROUND_TYPE_IDS } from './groundTypes.js';
 
 export class WorldGenerator {
     constructor(seed = Date.now()) {
         this.seed = seed;
         this.mapSystem = new TriangleMapSystem();
+
+        // Initialize terrain type thresholds
+        this.terrainThresholds = [];
+        const stepSize = 1.0 / GROUND_TYPE_IDS.length;
+        GROUND_TYPE_IDS.forEach((type, index) => {
+            this.terrainThresholds.push({
+                type: type,
+                threshold: (index + 1) * stepSize
+            });
+        });
     }
 
     // Simple random function with seed
@@ -54,10 +65,15 @@ export class WorldGenerator {
     generateTerrainType(q, r) {
         const value = this.noise(q * 0.1, r * 0.1);
         
-        if (value < 0.2) return 'WATER';
-        if (value < 0.4) return 'SAND';
-        if (value < 0.7) return 'GRASS';
-        return 'ROCK';
+        // Find the appropriate terrain type based on noise value
+        for (const { type, threshold } of this.terrainThresholds) {
+            if (value <= threshold) {
+                return type;
+            }
+        }
+        
+        // Fallback to last type if no threshold matched (shouldn't happen)
+        return GROUND_TYPE_IDS[GROUND_TYPE_IDS.length - 1];
     }
 
     // Generate elevation for a position
@@ -79,7 +95,4 @@ export class WorldGenerator {
     }
 }
 
-// Handle both ES modules and CommonJS
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = WorldGenerator;
-}
+export default WorldGenerator;

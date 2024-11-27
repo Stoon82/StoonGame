@@ -1,4 +1,4 @@
-import { Stoonie } from './Stoonie.js';
+import Stoonie from './Stoonie.js';
 
 export class StoonieManager {
     constructor(mapSystem) {
@@ -109,3 +109,5 @@ export class StoonieManager {
         };
     }
 }
+
+export default StoonieManager;

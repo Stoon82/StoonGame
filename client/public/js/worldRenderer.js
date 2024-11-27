@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import GridTriangleRenderer from './gridTriangleRenderer.js';
 import { getGroundTypeColor } from '@shared/world/groundTypes.js';
 

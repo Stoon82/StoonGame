@@ -1,12 +1,18 @@
-const fs = require('fs').promises;
-const path = require('path');
-const WorldConfig = require('../models/WorldConfig');
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import fs from 'fs/promises';
+import WorldConfig from '../models/WorldConfig.js';
+import { GROUND_TYPES } from '../../shared/world/groundTypes.js';
+import mapSystemRegistry from '../../shared/world/maps/MapSystemRegistry.js';
 
-class WorldManager {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+export class WorldManager {
     constructor() {
         this.activeWorlds = new Map();
-        this.worldsDir = path.join(__dirname, '..', 'maps', 'worlds');
-        this.playersDir = path.join(__dirname, '..', 'maps', 'players');
+        this.worldsDir = join(__dirname, '..', 'maps', 'worlds');
+        this.playersDir = join(__dirname, '..', 'maps', 'players');
         this.ensureDirectories();
     }
 
@@ -19,9 +25,12 @@ class WorldManager {
         const worldConfig = new WorldConfig(config);
         const worldId = `world_${worldConfig.seed}`;
         
+        const mapSystem = mapSystemRegistry.createMapSystem(worldConfig.mapSystem, worldConfig.mapParameters);
+
         // Create world data structure
         const worldData = {
             config: worldConfig.toJSON(),
+            mapSystem,
             mapData: {
                 centerPoints: {},
                 cornerPoints: {},
@@ -49,7 +58,7 @@ class WorldManager {
         }
 
         try {
-            const filePath = path.join(this.worldsDir, `${worldId}.json`);
+            const filePath = join(this.worldsDir, `${worldId}.json`);
             console.log(`[WorldManager] Reading from file: ${filePath}`);
 
             const data = await fs.readFile(filePath, 'utf8');
@@ -117,7 +126,7 @@ class WorldManager {
                 lastUpdate: saveData.lastUpdate
             });
 
-            const filePath = path.join(this.worldsDir, `${worldId}.json`);
+            const filePath = join(this.worldsDir, `${worldId}.json`);
             await fs.writeFile(filePath, JSON.stringify(saveData, null, 2));
             
             // Update active worlds cache
@@ -234,4 +243,4 @@ class WorldManager {
     }
 }
 
-module.exports = new WorldManager();
+export default new WorldManager();

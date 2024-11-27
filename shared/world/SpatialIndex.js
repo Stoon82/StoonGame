@@ -1,4 +1,4 @@
-class OctreeNode {
+export class OctreeNode {
     constructor(center, size) {
         this.center = center;
         this.size = size;
@@ -129,7 +129,7 @@ class OctreeNode {
     }
 }
 
-class SpatialIndex {
+export class SpatialIndex {
     constructor(worldSize = 1000) {
         this.root = new OctreeNode({ x: 0, y: 0 }, worldSize);
     }

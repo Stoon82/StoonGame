@@ -179,3 +179,5 @@ export class StoonieSoul {
         };
     }
 }
+
+export default StoonieSoul;
