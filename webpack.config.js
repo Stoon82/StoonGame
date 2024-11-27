@@ -33,7 +33,7 @@ module.exports = {
             directory: path.join(__dirname, 'client/public'),
         },
         hot: true,
-        port: 3000,
+        port: 8080,
         open: true
     },
     devtool: 'source-map'
