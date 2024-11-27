@@ -5,16 +5,28 @@
     <title>StoonGame - Triangle World Builder</title>
     <link rel="stylesheet" href="css/styles.css">
     <style>
-        body {
+        html, body {
             margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
             background-color: #1a1a1a;
             color: white;
             font-family: Arial, sans-serif;
         }
+        #game-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
         #gameCanvas {
             width: 100%;
-            height: 100vh;
+            height: 100%;
+            display: block;
+            background: #2a2a2a;
         }
         #previewPanel {
             position: fixed;
@@ -138,6 +150,26 @@
             margin: 0;
             white-space: pre-wrap;
         }
+        #debugPanel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            z-index: 1000;
+            min-width: 200px;
+            display: none;
+        }
+        #debugPanel div {
+            margin: 5px 0;
+            white-space: pre-wrap;
+        }
+        #debugPanel h3 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
     </style>
 </head>
 <body>
@@ -169,6 +201,24 @@
         <div>
             <strong>Corner Points:</strong>
             <pre id="cornerPointsDebug"></pre>
+        </div>
+    </div>
+    <div id="debugPanel">
+        <h3>Debug Information</h3>
+        <div id="serverStatus">Server Status: Disconnected</div>
+        <div id="latency">Latency: --ms</div>
+        <div id="fps">FPS: --</div>
+        <div id="worldStats">
+            🌍 World Stats:<br>
+            - Center Points: 0<br>
+            - Corner Points: 0<br>
+            - Buildings: 0<br>
+            - Resources: 0
+        </div>
+        <div id="playerStats">
+            👥 Player Stats:<br>
+            - Total Players: 0<br>
+            - Active Players: 0
         </div>
     </div>
     <script type="module" src="/dist/bundle.js"></script>

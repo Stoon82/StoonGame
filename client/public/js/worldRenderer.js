@@ -19,6 +19,11 @@ class WorldRenderer {
         this.lastMousePosition = null;
         this.mapSystem = mapSystem;
         
+        // Pass scene to mapSystem
+        if (this.mapSystem) {
+            this.mapSystem.setScene(this.isPreview ? null : this.scene);  // Only set scene for main renderer
+        }
+        
         // Initialize debug markers group
         this.debugMarkers = new THREE.Group();
         this.scene.add(this.debugMarkers);
@@ -76,16 +81,20 @@ class WorldRenderer {
     }
 
     setupEventListeners() {
+        window.addEventListener('resize', this.onWindowResize.bind(this));
+        
+        // Listen for Stoonie death events
+        window.addEventListener('stoonieDied', (event) => {
+            this.removeStoonie(event.detail.id);
+        });
+        
         if (!this.isPreview) {
-            window.addEventListener('resize', () => this.onWindowResize(), false);
             this.canvas.addEventListener('mousemove', (event) => this.handleMouseMove(event.clientX, event.clientY), false);
         }
     }
 
     onWindowResize() {
-        this.camera.aspect = window.innerWidth / window.innerHeight;
-        this.camera.updateProjectionMatrix();
-        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.updateSize();
     }
 
     clear() {
@@ -333,6 +342,53 @@ class WorldRenderer {
 
     getGroundTypeColor(groundType) {
         return getGroundTypeColor(groundType);
+    }
+
+    drawLine(start, end, color, width = 3) {
+        const ctx = this.canvas.getContext('2d');
+        const startPos = this.gridToScreen(start[0], start[1]);
+        const endPos = this.gridToScreen(end[0], end[1]);
+        
+        if (!startPos || !endPos) return;
+
+        ctx.beginPath();
+        ctx.moveTo(startPos.x, startPos.y);
+        ctx.lineTo(endPos.x, endPos.y);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.stroke();
+    }
+
+    drawCircle(center, radius, color) {
+        const ctx = this.canvas.getContext('2d');
+        const pos = this.gridToScreen(center[0], center[1]);
+        
+        if (!pos) return;
+
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+
+    gridToScreen(q, r) {
+        // Convert grid coordinates to screen coordinates
+        const size = this.triangleSize;
+        const x = q * size * Math.sqrt(3);
+        const y = r * size * 1.5;
+        return { x, y };
+    }
+
+    getLastMousePosition() {
+        return this.lastMousePosition;
+    }
+
+    updateSize() {
+        if (!this.isPreview) {
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.camera.aspect = window.innerWidth / window.innerHeight;
+            this.camera.updateProjectionMatrix();
+        }
     }
 }
 

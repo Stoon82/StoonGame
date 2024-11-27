@@ -1,0 +1,104 @@
+{
+  "config": {
+    "seed": 1732705148663,
+    "maxPlayers": 100,
+    "name": "Default World",
+    "description": "The default world where all players start"
+  },
+  "mapData": {
+    "centerPoints": {
+      "0,0": {
+        "worldPos": {
+          "x": 0,
+          "z": 0
+        },
+        "gridPos": {
+          "q": 0,
+          "r": 0
+        },
+        "groundType": "SAND"
+      }
+    },
+    "cornerPoints": {
+      "-1,-0.577": {
+        "worldPos": {
+          "x": -1,
+          "y": 0,
+          "z": -0.8660254037844386
+        },
+        "gridPos": {
+          "q": -1,
+          "r": 0
+        },
+        "groundType": "GRASS"
+      },
+      "1,-0.577": {
+        "worldPos": {
+          "x": 1,
+          "y": 0,
+          "z": -0.8660254037844386
+        },
+        "gridPos": {
+          "q": 1,
+          "r": 0
+        },
+        "groundType": "GRASS"
+      },
+      "0,1.155": {
+        "worldPos": {
+          "x": 0,
+          "y": 0,
+          "z": 0.8660254037844386
+        },
+        "gridPos": {
+          "q": 0,
+          "r": 1
+        },
+        "groundType": "GRASS"
+      },
+      "-1,0": {
+        "worldPos": {
+          "x": -1,
+          "z": 0
+        },
+        "gridPos": {
+          "q": -1,
+          "r": 0
+        },
+        "groundType": "SAND"
+      },
+      "1,0": {
+        "worldPos": {
+          "x": 1,
+          "z": 0
+        },
+        "gridPos": {
+          "q": 1,
+          "r": 0
+        },
+        "groundType": "SAND"
+      },
+      "0,1": {
+        "worldPos": {
+          "x": 0,
+          "z": 1
+        },
+        "gridPos": {
+          "q": 0,
+          "r": 1
+        },
+        "groundType": "SAND"
+      }
+    },
+    "buildings": {},
+    "resources": {}
+  },
+  "players": [
+    "C5FS0Fdb6LsPX8cWAAAJ",
+    "tc4JdizxAxyzQqm6AAAJ",
+    "zrwZ4c2vpIly8HzVAAAR",
+    "7WN_OJxNAePiQhm1AAAD"
+  ],
+  "lastUpdate": 1732705148663,
+  "version": "1.0.0"
+}
