@@ -11,6 +11,8 @@ const generateUUID = () => {
     });
 };
 
+import { ConstructionTask } from '../tasks/ConstructionTask.js';
+
 export class StoonieSoul {
     constructor() {
         // Basic attributes
@@ -56,6 +58,11 @@ export class StoonieSoul {
             totalLifespan: 0, // Combined lifespan of all connected Stoonies
             significantEvents: [] // Array of important events
         };
+
+        // Construction task handling
+        this.currentTask = null;
+        this.connectedStoonie = null;
+        this.state = 'idle';
     }
 
     // Experience and leveling
@@ -164,6 +171,49 @@ export class StoonieSoul {
         // Skill-specific bonuses could be applied here
     }
 
+    // Construction task handling
+    update(deltaTime) {
+        if (this.currentTask) {
+            this.currentTask.update(deltaTime);
+            
+            if (this.currentTask.isComplete()) {
+                this.currentTask = null;
+                this.state = 'idle';
+            }
+        }
+    }
+
+    setTask(task) {
+        this.currentTask = task;
+        if (task) {
+            this.state = 'working';
+        } else {
+            this.state = 'idle';
+        }
+    }
+
+    assignToConstruction(building) {
+        if (this.currentTask || !this.connectedStoonie) return false;
+        
+        this.currentTask = new ConstructionTask(building, this.connectedStoonie);
+        this.state = 'working';
+        return true;
+    }
+
+    connectToStoonieForConstruction(stoonie) {
+        if (this.connectedStoonie) return false;
+        this.connectedStoonie = stoonie;
+        return true;
+    }
+
+    disconnectFromStoonieForConstruction(reason = null) {
+        if (!this.connectedStoonie) return false;
+        this.connectedStoonie = null;
+        this.currentTask = null;
+        this.state = 'idle';
+        return true;
+    }
+
     // Get current status
     getStatus() {
         return {
@@ -175,7 +225,11 @@ export class StoonieSoul {
             connectedStoonieId: this.connectedStoonieId,
             mana: this.mana,
             skills: this.skills,
-            history: this.history
+            history: this.history,
+            state: this.state,
+            hasTask: !!this.currentTask,
+            taskStatus: this.currentTask?.getStatus() || null,
+            isConnectedForConstruction: !!this.connectedStoonie
         };
     }
 }

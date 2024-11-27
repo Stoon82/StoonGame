@@ -1,49 +1,40 @@
 // UUID generation for browser and Node.js environments
-import crypto from 'crypto';
-
-const generateUUID = () => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-    }
-    // Fallback implementation
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-};
-
-import * as THREE from 'three';
+import { generateUUID } from '../utils/uuid.js';
 import { GROUND_TYPES } from '../config/groundTypes.js';
+import * as THREE from 'three';
 
 class Stoonie {
-    constructor(gender = Math.random() < 0.5 ? 'male' : 'female', scene = null) {
+    constructor(properties = {}) {
         // Basic attributes
         this.id = generateUUID();
-        this.gender = gender;
+        this.gender = properties?.gender || (Math.random() < 0.5 ? 'male' : 'female');
         this.age = 0; // Age in days
         this.maxAge = 70 + Math.random() * 30; // Random max age between 70-100 days
         this.pregnant = false;
         this.pregnancyProgress = 0; // 0-1
         this.pregnancyDuration = 9; // 9 days for pregnancy
-        this.scene = scene;  // Store scene reference
+        this.scene = properties?.scene || null;  // Store scene reference
 
         // Position
-        this.q = 0;
-        this.r = 0;
-        this.worldX = 0;
-        this.worldZ = 0;
-        this.targetWorldX = 0;
-        this.targetWorldZ = 0;
+        this.q = properties?.q || 0;
+        this.r = properties?.r || 0;
+        this.worldX = properties?.worldX || 0;
+        this.worldZ = properties?.worldZ || 0;
+        this.targetWorldX = this.worldX;
+        this.targetWorldZ = this.worldZ;
         this.moveProgress = 1; // 1 means movement complete
         this.moveDuration = 1.5; // seconds to complete a move
         this.moveTimer = 0;
-        this.moveDelay = 0.5 + Math.random(); // Random delay between moves (0.5-1.5 seconds)
+        this.moveDelay = properties?.moveDelay || 0.5 + Math.random(); // Random delay between moves (0.5-1.5 seconds)
         this.delayTimer = 0;
-        this.baseSpeed = 1.0; // Base movement speed
+        this.baseSpeed = properties?.speed || 1.0; // Base movement speed
         this.speed = this.baseSpeed; // Current speed (modified by terrain)
-        this.wanderRadius = 0.6; // How far from triangle center they can wander
-        
+        this.wanderRadius = properties?.wanderRadius || 0.6; // How far from triangle center they can wander
+
+        // Task handling
+        this.currentTask = null;
+        this.connectedSoul = null;
+
         // Ground type movement modifiers
         this.groundSpeedModifiers = {
             [GROUND_TYPES.GRASS.id]: 1.5,    // Fast on grass
@@ -61,7 +52,7 @@ class Stoonie {
             hunger: 100,    // Decreases over time, replenished by eating
             thirst: 100,    // Decreases over time, replenished by drinking
             energy: 100,    // Decreases with activity, replenished by resting
-            sleep: 0,     // Increases while awake, decreased by sleeping
+            sleep: 0,       // Increases while awake, decreased by sleeping
             health: 100     // Affected by other needs, medical care
         };
 
@@ -83,7 +74,6 @@ class Stoonie {
 
         // Soul management
         this.hasConnectedSoul = false;
-        this.connectedSoul = null;
 
         // Debug visualization
         this.debugLines = [];
@@ -152,6 +142,16 @@ class Stoonie {
     }
 
     update(deltaTime, grid) {
+        // Handle current task if any
+        if (this.currentTask) {
+            this.currentTask.update(deltaTime);
+            
+            if (this.currentTask.isComplete()) {
+                this.currentTask = null;
+            }
+            return; // Skip normal movement when on a task
+        }
+
         // Check current ground type and update UI immediately
         const newGroundType = grid.getGroundTypeAtPosition(this.worldX, this.worldZ);
         if (newGroundType !== this.currentGroundType) {
@@ -552,6 +552,10 @@ class Stoonie {
             });
             this.debugLines = [];
         }
+    }
+
+    setTask(task) {
+        this.currentTask = task;
     }
 }
 

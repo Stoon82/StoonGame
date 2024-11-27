@@ -6,6 +6,7 @@ class DebugUI {
         this.fpsElement = document.getElementById('fps');
         this.worldStatsElement = document.getElementById('worldStats');
         this.playerStatsElement = document.getElementById('playerStats');
+        this.debugElement = document.getElementById('debugInfo');
 
         if (!this.debugPanel) {
             console.error('[DebugUI] Debug panel element not found!');
@@ -56,6 +57,24 @@ class DebugUI {
                 - Resources: ${stats.resources?.length || 0}
             `;
         }
+    }
+
+    updateDebugInfo(gameState) {
+        if (!this.debugElement) return;
+
+        const stoonieCount = gameState.stoonieManager?.stoonies.size || 0;
+        const mapSystemName = gameState.mapSystem?.constructor.name || 'No Map System';
+        const mapName = gameState.mapSystem?.currentMap?.name || 'No Map Loaded';
+
+        this.debugElement.innerHTML = `
+            <div class="debug-section">
+                <h3>Game State</h3>
+                <p>FPS: ${gameState.fps.toFixed(1)}</p>
+                <p>Active Stoonies: ${stoonieCount}</p>
+                <p>Map System: ${mapSystemName}</p>
+                <p>Current Map: ${mapName}</p>
+            </div>
+        `;
     }
 
     toggle() {

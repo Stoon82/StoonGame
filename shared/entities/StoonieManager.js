@@ -23,25 +23,31 @@ export class StoonieManager {
             return null;
         }
 
-        const stoonie = new Stoonie(gender, this.mapSystem.scene);
-        
-        // Set grid coordinates
-        stoonie.q = q;
-        stoonie.r = r;
-        stoonie.targetQ = q;
-        stoonie.targetR = r;
-        stoonie.startQ = q;
-        stoonie.startR = r;
+        // Create properties object for Stoonie
+        const properties = {
+            gender: gender || (Math.random() < 0.5 ? 'male' : 'female'),
+            q: q,
+            r: r,
+            worldX: worldPos.x,
+            worldZ: worldPos.z,
+            scene: this.mapSystem.scene,
+            speed: 1.0,
+            moveDelay: 0.5 + Math.random(),
+            wanderRadius: 0.6
+        };
 
-        // Set world coordinates
-        stoonie.worldX = worldPos.x;
-        stoonie.worldZ = worldPos.z;
-        stoonie.targetWorldX = worldPos.x;
-        stoonie.targetWorldZ = worldPos.z;
-        stoonie.startWorldX = worldPos.x;
-        stoonie.startWorldZ = worldPos.z;
+        // Create new Stoonie with properties
+        const stoonie = new Stoonie(properties);
 
+        // Add to manager
         this.stoonies.set(stoonie.id, stoonie);
+        console.log(`[StoonieManager] Created Stoonie ${stoonie.id} at (${q}, ${r}), world pos: (${worldPos.x.toFixed(2)}, ${worldPos.z.toFixed(2)})`);
+
+        // Emit event for renderer to create visual representation
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('stoonieCreated', { detail: stoonie }));
+        }
+
         return stoonie;
     }
 
@@ -99,6 +105,20 @@ export class StoonieManager {
                 window.dispatchEvent(new CustomEvent('stoonieDied', { detail: { id } }));
             }
         });
+    }
+
+    findStooniesInRange(x, z, range) {
+        const nearbyStoonies = [];
+        for (const stoonie of this.stoonies.values()) {
+            const dx = stoonie.worldX - x;
+            const dz = stoonie.worldZ - z;
+            const distance = Math.sqrt(dx * dx + dz * dz);
+            
+            if (distance <= range) {
+                nearbyStoonies.push(stoonie);
+            }
+        }
+        return nearbyStoonies;
     }
 
     getStatus() {

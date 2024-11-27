@@ -367,9 +367,36 @@ class TriangleMapSystem {
 
     // Get world position for grid coordinates
     getWorldPosition(q, r) {
-        const centerKey = this.gridToKey(q, r);
-        if (!this.centerPoints.has(centerKey)) return null;
-        return this.centerPoints.get(centerKey).worldPos;
+        // Check if the position exists in centerPoints
+        const key = `${q},${r}`;
+        const centerPoint = this.centerPoints.get(key);
+        
+        if (centerPoint && centerPoint.worldPos) {
+            return {
+                x: centerPoint.worldPos.x,
+                y: 0,
+                z: centerPoint.worldPos.z
+            };
+        }
+
+        // If not found in centerPoints, calculate the position
+        // Convert axial coordinates (q,r) to world coordinates (x,z)
+        const x = this.size * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r);
+        const z = this.size * (3/2 * r);
+
+        return { x, y: 0, z };
+    }
+
+    getGridPosition(worldX, worldZ) {
+        // Convert world coordinates (x,z) to axial coordinates (q,r)
+        const q = (Math.sqrt(3)/3 * worldX - 1/3 * worldZ) / this.size;
+        const r = (2/3 * worldZ) / this.size;
+
+        // Round to nearest grid coordinates
+        return {
+            q: Math.round(q),
+            r: Math.round(r)
+        };
     }
 
     // Debug method to log the current state of points
@@ -609,6 +636,20 @@ class TriangleMapSystem {
         
         return s >= 0 && t >= 0 && (1 - s - t) >= 0;
     }
+
+    getAllCenterPoints() {
+        const points = [];
+        for (const [key, point] of this.centerPoints.entries()) {
+            const [q, r] = key.split(',').map(Number);
+            points.push({
+                gridPos: { q, r },
+                worldPos: point.worldPos,
+                groundType: point.groundType
+            });
+        }
+        return points;
+    }
+
 }
 
 export default TriangleMapSystem;

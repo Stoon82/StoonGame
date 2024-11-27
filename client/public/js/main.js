@@ -529,11 +529,11 @@ class Game {
         this.updateStoonieStats();
 
         // Update renderer
-        for (const stoonie of this.stoonieManager.stoonies.values()) {
-            this.renderer.updateStoonie(stoonie);
-        }
+        this.renderer.updateStooniePositions(this.stoonieManager.stoonies, deltaTime);
         this.renderer.render();
-        this.previewRenderer.render();
+        if (this.previewRenderer) {
+            this.previewRenderer.render();
+        }
 
         // Render edges
         const edges = this.edgeSystem.getAllEdges();
@@ -710,25 +710,25 @@ class Game {
     }
 
     addRandomStoonie() {
-        // Find a valid position for the new Stoonie
-        const validPositions = [];
-        for (const [key, center] of this.mapSystem.centerPoints.entries()) {
-            const [q, r] = key.split(',').map(Number);
-            validPositions.push({ q, r });
-        }
-
-        if (validPositions.length === 0) {
-            console.log('[Game] No valid positions found for new Stoonie');
+        // Get all valid ground tiles
+        const validTiles = this.mapSystem.getAllCenterPoints();
+        if (validTiles.length === 0) {
+            console.warn('[Game] No valid tiles to spawn Stoonie on');
             return;
         }
 
-        // Pick a random valid position
-        const randomPos = validPositions[Math.floor(Math.random() * validPositions.length)];
-        const stoonie = this.stoonieManager.createStoonie(randomPos.q, randomPos.r);
-        
+        // Pick a random tile
+        const randomTile = validTiles[Math.floor(Math.random() * validTiles.length)];
+        const { q, r } = randomTile.gridPos;
+
+        // Create the Stoonie
+        const stoonie = this.stoonieManager.createStoonie(q, r);
         if (stoonie) {
-            console.log('[Game] Created new Stoonie:', stoonie);
-            this.renderer.renderStoonie(stoonie);
+            console.log(`[Game] Created new Stoonie at (${q}, ${r})`);
+            // Update the debug UI
+            this.updateStoonieStats();
+        } else {
+            console.error(`[Game] Failed to create Stoonie at (${q}, ${r})`);
         }
     }
 }

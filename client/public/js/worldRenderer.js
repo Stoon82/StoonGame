@@ -87,6 +87,11 @@ class WorldRenderer {
         window.addEventListener('stoonieDied', (event) => {
             this.removeStoonie(event.detail.id);
         });
+
+        // Listen for Stoonie creation events
+        window.addEventListener('stoonieCreated', (event) => {
+            this.createStoonieMesh(event.detail);
+        });
         
         if (!this.isPreview) {
             this.canvas.addEventListener('mousemove', (event) => this.handleMouseMove(event.clientX, event.clientY), false);
@@ -285,38 +290,121 @@ class WorldRenderer {
         return sprite;
     }
 
-    renderStoonie(stoonie) {
-        // Create a Stoonie mesh - a sphere for now
+    createStoonieMesh(stoonie) {
+        // Create a simple colored sphere for now
         const geometry = new THREE.SphereGeometry(0.2, 32, 32);
         const material = new THREE.MeshPhongMaterial({ 
             color: stoonie.gender === 'male' ? 0x4444ff : 0xff4444,
-            emissive: stoonie.gender === 'male' ? 0x222266 : 0x662222,
             shininess: 30
         });
         const mesh = new THREE.Mesh(geometry, material);
         
-        // Position the Stoonie using world coordinates
-        mesh.position.set(stoonie.worldX, 0.5, stoonie.worldZ);
+        // Position the mesh
+        mesh.position.set(stoonie.worldX, 0.2, stoonie.worldZ);
         
-        // Store the mesh
-        this.stoonieMeshes.set(stoonie.id, mesh);
+        // Create healthbar
+        const healthBarWidth = 0.4;
+        const healthBarHeight = 0.05;
+        const healthBarGeometry = new THREE.PlaneGeometry(healthBarWidth, healthBarHeight);
+        const healthBarMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ff00,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.8
+        });
+        const healthBarBackground = new THREE.Mesh(
+            healthBarGeometry,
+            new THREE.MeshBasicMaterial({
+                color: 0x333333,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.5
+            })
+        );
+        const healthBar = new THREE.Mesh(healthBarGeometry, healthBarMaterial);
+        
+        // Position healthbars above Stoonie
+        healthBarBackground.position.y = 0.5;
+        healthBar.position.y = 0.5;
+        
+        // Add healthbars as children of the mesh
+        mesh.add(healthBarBackground);
+        mesh.add(healthBar);
+        
+        // Store references
+        mesh.healthBar = healthBar;
+        mesh.healthBarBackground = healthBarBackground;
+        
+        // Add to scene and store reference
         this.scene.add(mesh);
+        this.stoonieMeshes.set(stoonie.id, mesh);
         
-        return mesh;
+        console.log(`[WorldRenderer] Created mesh for Stoonie ${stoonie.id}`);
     }
 
-    updateStoonie(stoonie) {
-        const mesh = this.stoonieMeshes.get(stoonie.id);
-        if (mesh) {
-            mesh.position.set(stoonie.worldX, 0.5, stoonie.worldZ);
+    updateStooniePositions(stoonies, deltaTime) {
+        for (const [id, mesh] of this.stoonieMeshes) {
+            const stoonie = stoonies.get(id);
+            if (!stoonie) continue;
+
+            // Update position
+            mesh.position.set(stoonie.worldX, 0.2, stoonie.worldZ);
+
+            // Update healthbar
+            if (mesh.healthBar) {
+                const health = stoonie.needs.health / 100;
+                mesh.healthBar.scale.x = health;
+                mesh.healthBar.material.color.setHex(
+                    health < 0.2 ? 0xff0000 :  // Red
+                    health < 0.4 ? 0xff8c00 :  // Orange
+                    0x00ff00                   // Green
+                );
+            }
+
+            // Update debug lines if in debug mode
+            if (window.DEBUG_MODE && stoonie.moveProgress < 1) {
+                // Remove old debug lines
+                if (mesh.debugLine) {
+                    this.scene.remove(mesh.debugLine);
+                }
+
+                // Create new debug line
+                const points = [
+                    new THREE.Vector3(stoonie.startWorldX, 0.1, stoonie.startWorldZ),
+                    new THREE.Vector3(stoonie.targetWorldX, 0.1, stoonie.targetWorldZ)
+                ];
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineBasicMaterial({ 
+                    color: 0xffff00,
+                    transparent: true,
+                    opacity: 0.5
+                });
+                const line = new THREE.Line(geometry, material);
+                this.scene.add(line);
+                mesh.debugLine = line;
+            } else if (mesh.debugLine) {
+                this.scene.remove(mesh.debugLine);
+                mesh.debugLine = null;
+            }
+        }
+
+        // Make healthbars face the camera
+        const cameraPosition = this.camera.position;
+        for (const mesh of this.stoonieMeshes.values()) {
+            if (mesh.healthBar) {
+                mesh.healthBar.lookAt(cameraPosition);
+                mesh.healthBarBackground.lookAt(cameraPosition);
+            }
         }
     }
 
-    removeStoonie(stoonieId) {
-        const mesh = this.stoonieMeshes.get(stoonieId);
+    removeStoonie(id) {
+        const mesh = this.stoonieMeshes.get(id);
         if (mesh) {
             this.scene.remove(mesh);
-            this.stoonieMeshes.delete(stoonieId);
+            mesh.geometry.dispose();
+            mesh.material.dispose();
+            this.stoonieMeshes.delete(id);
         }
     }
 
