@@ -9,29 +9,34 @@ export class StoonieManager {
         this.lastUpdateTime = performance.now() / 1000;
     }
 
-    createStoonie(q, r, gender = null) {
-        // Validate position
-        if (q === undefined || r === undefined) {
-            console.error('[StoonieManager] Cannot create Stoonie: Invalid grid position');
-            return null;
-        }
+    createStoonie(options = {}) {
+        let worldX, worldZ;
 
-        // Get world position before creating Stoonie
-        const worldPos = this.mapSystem.getWorldPosition(q, r);
-        if (!worldPos) {
-            console.error(`[StoonieManager] Cannot create Stoonie: No valid world position at (${q}, ${r})`);
+        if (options.q !== undefined && options.r !== undefined) {
+            // Create from grid position
+            const worldPos = this.mapSystem.getWorldPosition(options.q, options.r);
+            if (!worldPos) {
+                console.error(`[StoonieManager] Cannot create Stoonie: No valid world position at (${options.q}, ${options.r})`);
+                return null;
+            }
+            worldX = worldPos.x;
+            worldZ = worldPos.z;
+        } else if (options.worldX !== undefined && options.worldZ !== undefined) {
+            // Create from world position
+            worldX = options.worldX;
+            worldZ = options.worldZ;
+        } else {
+            console.error('[StoonieManager] Cannot create Stoonie: No valid position provided');
             return null;
         }
 
         // Create properties object for Stoonie
         const properties = {
-            gender: gender || (Math.random() < 0.5 ? 'male' : 'female'),
-            q: q,
-            r: r,
-            worldX: worldPos.x,
-            worldZ: worldPos.z,
+            gender: options.gender || (Math.random() < 0.5 ? 'male' : 'female'),
+            worldX: worldX,
+            worldZ: worldZ,
             scene: this.mapSystem.scene,
-            speed: 1.0,
+            speed: 1.0 + (Math.random() * 0.5), // Random speed between 1.0 and 1.5
             moveDelay: 0.5 + Math.random(),
             wanderRadius: 0.6
         };
@@ -41,7 +46,7 @@ export class StoonieManager {
 
         // Add to manager
         this.stoonies.set(stoonie.id, stoonie);
-        console.log(`[StoonieManager] Created Stoonie ${stoonie.id} at (${q}, ${r}), world pos: (${worldPos.x.toFixed(2)}, ${worldPos.z.toFixed(2)})`);
+        console.log(`[StoonieManager] Created Stoonie ${stoonie.id} at world pos: (${worldX.toFixed(2)}, ${worldZ.toFixed(2)})`);
 
         // Emit event for renderer to create visual representation
         if (typeof window !== 'undefined') {

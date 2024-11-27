@@ -153,16 +153,21 @@ class Game {
     startRenderLoop() {
         let lastTime = performance.now();
         const animate = (currentTime) => {
-            const deltaTime = currentTime - lastTime;
+            const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
             lastTime = currentTime;
+
+            // Update game state
+            this.stoonieManager.update(deltaTime);
+            this.updateStoonieStats();
 
             // Update FPS in debug UI if debug mode is active
             if (this.debugMode) {
                 this.debugUI.updateFPS(1000 / deltaTime);
             }
 
-            // Render the scene
+            // Update Stoonie positions and render
             if (this.renderer) {
+                this.renderer.updateStooniePositions(this.stoonieManager.stoonies, deltaTime);
                 this.renderer.render();
             }
 
@@ -216,6 +221,11 @@ class Game {
     }
 
     initUI() {
+        // Create stoonies list container
+        this.stooniesList = document.createElement('div');
+        this.stooniesList.id = 'stoonies-list';
+        document.body.appendChild(this.stooniesList);
+
         // Add building UI
         const buildingUI = document.createElement('div');
         buildingUI.id = 'building-ui';
@@ -710,25 +720,36 @@ class Game {
     }
 
     addRandomStoonie() {
-        // Get all valid ground tiles
-        const validTiles = this.mapSystem.getAllCenterPoints();
-        if (validTiles.length === 0) {
-            console.warn('[Game] No valid tiles to spawn Stoonie on');
+        // Find a valid ground position
+        const validGroundTypes = ['grass', 'sand', 'woods'];
+        let validPosition = null;
+
+        // Search through the map for a valid position
+        for (const [key, point] of this.mapSystem.centerPoints) {
+            if (validGroundTypes.includes(point.groundType?.toLowerCase())) {
+                validPosition = point.worldPos;
+                break;
+            }
+        }
+
+        if (!validPosition) {
+            console.warn('No valid position found for new Stoonie');
             return;
         }
 
-        // Pick a random tile
-        const randomTile = validTiles[Math.floor(Math.random() * validTiles.length)];
-        const { q, r } = randomTile.gridPos;
+        // Create a new Stoonie at the valid position
+        const stoonie = this.stoonieManager.createStoonie({
+            worldX: validPosition.x,
+            worldZ: validPosition.z,
+            gender: Math.random() > 0.5 ? 'male' : 'female'
+        });
 
-        // Create the Stoonie
-        const stoonie = this.stoonieManager.createStoonie(q, r);
         if (stoonie) {
-            console.log(`[Game] Created new Stoonie at (${q}, ${r})`);
-            // Update the debug UI
-            this.updateStoonieStats();
-        } else {
-            console.error(`[Game] Failed to create Stoonie at (${q}, ${r})`);
+            console.log('Created new Stoonie:', stoonie);
+            // Dispatch event for renderer
+            window.dispatchEvent(new CustomEvent('stoonieCreated', { 
+                detail: stoonie 
+            }));
         }
     }
 }
