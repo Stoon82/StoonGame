@@ -176,6 +176,15 @@
     <div id="game-container">
         <canvas id="gameCanvas"></canvas>
     </div>
+    <!-- Debug Panel -->
+<div id="debugPanel" style="display: none; position: fixed; top: 10px; left: 10px; background: rgba(0, 0, 0, 0.8); padding: 10px; border-radius: 5px; z-index: 1000;">
+    <div id="serverStatus">Server Status: Disconnected</div>
+    <div id="latency">Latency: --ms</div>
+    <div id="fps">FPS: --</div>
+    <div id="worldStats">World Stats: --</div>
+    <div id="playerStats">Player Stats: --</div>
+    <div id="debugInfo" style="max-height: 200px; overflow-y: auto; margin-top: 10px;"></div>
+</div>
     <div id="stoonies-list">
         <div id="statsPanel">
             <h3>Stoonies</h3>

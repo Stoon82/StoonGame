@@ -16,7 +16,7 @@
           "q": 0,
           "r": 0
         },
-        "groundType": "SAND"
+        "groundType": "ROCK"
       }
     },
     "cornerPoints": {
@@ -65,7 +65,7 @@
           "q": -1,
           "r": 0
         },
-        "groundType": "SAND"
+        "groundType": "ROCK"
       },
       "1,0": {
         "worldPos": {
@@ -76,7 +76,7 @@
           "q": 1,
           "r": 0
         },
-        "groundType": "SAND"
+        "groundType": "ROCK"
       },
       "0,1": {
         "worldPos": {
@@ -87,7 +87,7 @@
           "q": 0,
           "r": 1
         },
-        "groundType": "SAND"
+        "groundType": "ROCK"
       }
     },
     "buildings": {},
@@ -108,7 +108,9 @@
     "j-99sOycCVNLaOFBAAAB",
     "p1R0jxZic7xDaAsuAAAJ",
     "ckIB4S8RIQfTqHf-AAAz",
-    "s1O2Z6M-ofBjt0DbAAAj"
+    "eb0OC93bi4ugp5yNAAAz",
+    "QPeJ6lMWY1dGlVsWAAAR",
+    "LRmAuce8Tk4GrdEgAAAx"
   ],
   "lastUpdate": 1732705148663,
   "version": "1.0.0"
