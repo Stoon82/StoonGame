@@ -4,10 +4,10 @@ import { StoonieManager } from '@shared/entities/StoonieManager.js';
 import { getRandomGroundType } from '@shared/world/groundTypes.js';
 import { GROUND_TYPES } from '@shared/config/groundTypes.js';
 import { io } from 'socket.io-client';
-import BuildingSystem from './buildingSystem.js';
 import EdgeSystem from '@shared/world/edgeSystem.js';
 import EdgeUI from './edgeUI.js';
 import { debugManager } from './modules/debug/debugManager.js';
+import GameManager from './modules/core/gameManager.js';
 
 console.log('Initializing game...');
 
@@ -53,52 +53,42 @@ class Game {
         });
 
         // Initialize socket connection
-        this.socket = io('http://localhost:3000', {
-            path: '/socket.io/',
-            transports: ['websocket'],
-            autoConnect: true,
-            reconnection: true,
-            reconnectionAttempts: 5,
-            reconnectionDelay: 1000
-        });
-
+        this.gameManager = new GameManager();
+        this.currentCursorGroundType = getRandomGroundType();
+        this.initUI();
+        this.setupGameControls();
         this.setupSocketHandlers();
         this.startRenderLoop();
-
-        // Initialize building system
-        this.buildingSystem = new BuildingSystem(this.mapSystem, this.renderer);
 
         // Initialize edge system
         this.edgeSystem = new EdgeSystem();
         this.edgeUI = new EdgeUI(this.edgeSystem, this.mapSystem);
 
         // Initialize UI state
-        this.currentCursorGroundType = getRandomGroundType();
         this.lastUpdateTime = performance.now() / 1000;
 
-        this.initUI(); 
         this.setupEventListeners();
         this.generateNewWorld();
     }
 
     setupSocketHandlers() {
-        this.socket.on('connect', () => {
+        this.gameManager.socket.on('connect', () => {
             console.log('[Client] Connected to server');
             debugManager.updateServerStatus('Connected');
         });
 
-        this.socket.on('disconnect', () => {
+        this.gameManager.socket.on('disconnect', () => {
             console.log('[Client] Disconnected from server');
             debugManager.updateServerStatus('Disconnected');
         });
 
-        this.socket.on('error', (error) => {
+        this.gameManager.socket.on('error', (error) => {
             console.error('[Client] Socket error:', error);
             debugManager.updateServerStatus('Error: ' + error.message);
         });
 
         // Handle initial world data
-        this.socket.on('worldData', (data) => {
+        this.gameManager.socket.on('worldData', (data) => {
             console.log('[Client] Received world data:', data);
             if (data && data.mapData) {
                 // Clear existing map data first
@@ -181,16 +171,16 @@ class Game {
     }
 
     joinRoom(mapId) {
-        this.socket.emit('joinRoom', { mapId });
+        this.gameManager.socket.emit('joinRoom', { mapId });
         console.log(`[Client] Joining room: ${mapId}`);
     }
 
     setupEventListeners() {
         // World generation
-        document.getElementById('newWorldBtn').addEventListener('click', () => this.generateNewWorld());
+        document.getElementById('newWorldBtn').addEventListener('click', () => this.gameManager.socket.emit('generateNewWorld'));
 
         // Stoonie management
-        document.getElementById('addStoonieBtn').addEventListener('click', () => this.addRandomStoonie());
+        document.getElementById('addStoonieBtn').addEventListener('click', () => this.gameManager.socket.emit('addStoonie'));
 
         // Mouse interaction
         this.canvas.addEventListener('mousemove', (event) => {
@@ -215,141 +205,48 @@ class Game {
     }
 
     initUI() {
-        // Create stoonies list container
-        this.stooniesList = document.createElement('div');
-        this.stooniesList.id = 'stoonies-list';
-        document.body.appendChild(this.stooniesList);
-
-        // Add building UI
-        const buildingUI = document.createElement('div');
-        buildingUI.id = 'building-ui';
-        buildingUI.style.cssText = `
-            position: fixed;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            padding: 10px;
-            border-radius: 5px;
-            color: white;
-            display: none;
-        `;
-        
-        const buildingToggle = document.createElement('button');
-        buildingToggle.textContent = '🏠 Build';
-        buildingToggle.style.cssText = `
-            position: fixed;
-            right: 20px;
-            top: 20px;
-            padding: 10px;
-            background: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        `;
-        buildingToggle.onclick = () => this.toggleBuildingMode();
-        
-        const buildingList = document.createElement('div');
-        buildingList.id = 'building-list';
-        buildingList.style.cssText = `
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            max-height: 80vh;
-            overflow-y: auto;
-        `;
-        
-        // Populate building options
-        const buildings = this.buildingSystem.getAvailableBuildings();
-        buildings.forEach(building => {
-            const buildingOption = document.createElement('div');
-            buildingOption.className = 'building-option';
-            buildingOption.style.cssText = `
-                padding: 10px;
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 3px;
-                cursor: pointer;
-                transition: background 0.2s;
-            `;
-            buildingOption.innerHTML = `
-                <strong>${building.type.charAt(0).toUpperCase() + building.type.slice(1)} (${building.size})</strong>
-                <br>Size: ${building.specs.width}x${building.specs.height}
-                <br>Cost: ${building.specs.cost}
-            `;
-            buildingOption.onmouseover = () => {
-                buildingOption.style.background = 'rgba(255, 255, 255, 0.2)';
-            };
-            buildingOption.onmouseout = () => {
-                buildingOption.style.background = 'rgba(255, 255, 255, 0.1)';
-            };
-            buildingOption.onclick = () => {
-                this.selectBuilding(building);
-            };
-            buildingList.appendChild(buildingOption);
-        });
-        
-        buildingUI.appendChild(buildingList);
-        document.body.appendChild(buildingToggle);
-        document.body.appendChild(buildingUI);
-        
-        // Add styles
-        const style = document.createElement('style');
-        style.textContent = `
-            #building-ui::-webkit-scrollbar {
-                width: 8px;
-            }
-            #building-ui::-webkit-scrollbar-track {
-                background: rgba(255, 255, 255, 0.1);
-            }
-            #building-ui::-webkit-scrollbar-thumb {
-                background: rgba(255, 255, 255, 0.3);
-                border-radius: 4px;
-            }
-            .building-option.selected {
-                background: rgba(76, 175, 80, 0.3) !important;
-            }
-        `;
-        document.head.appendChild(style);
-    }
-
-    toggleBuildingMode() {
-        this.buildingMode = !this.buildingMode;
-        const buildingUI = document.getElementById('building-ui');
-        buildingUI.style.display = this.buildingMode ? 'block' : 'none';
-        
-        if (!this.buildingMode) {
-            this.selectedBuilding = null;
-            document.querySelectorAll('.building-option').forEach(option => {
-                option.classList.remove('selected');
+        // Initialize UI elements
+        const groundTypeSelect = document.getElementById('groundTypeSelect');
+        if (groundTypeSelect) {
+            Object.entries(GROUND_TYPES).forEach(([key, value]) => {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = value.name;
+                groundTypeSelect.appendChild(option);
             });
         }
     }
 
-    selectBuilding(building) {
-        this.selectedBuilding = building;
-        document.querySelectorAll('.building-option').forEach(option => {
-            option.classList.remove('selected');
-        });
-        event.currentTarget.classList.add('selected');
+    setupGameControls() {
+        // World generation
+        const newWorldBtn = document.getElementById('newWorldBtn');
+        if (newWorldBtn) {
+            newWorldBtn.addEventListener('click', () => {
+                this.gameManager.socket.emit('generateNewWorld');
+            });
+        }
+
+        // Stoonie management
+        const addStoonieBtn = document.getElementById('addStoonieBtn');
+        if (addStoonieBtn) {
+            addStoonieBtn.addEventListener('click', () => {
+                this.gameManager.socket.emit('addStoonie');
+            });
+        }
+
+        // Ground type selection
+        const groundTypeSelect = document.getElementById('groundTypeSelect');
+        if (groundTypeSelect) {
+            groundTypeSelect.addEventListener('change', (event) => {
+                this.currentCursorGroundType = event.target.value;
+                this.gameManager.setGroundType(event.target.value);
+            });
+        }
     }
 
     handleCanvasClick(x, y) {
         const worldPos = this.screenToWorld(x, y);
         if (!worldPos) return;
-
-        if (this.buildingMode && this.selectedBuilding) {
-            const building = this.buildingSystem.placeBuilding(
-                this.selectedBuilding.type,
-                this.selectedBuilding.size,
-                worldPos
-            );
-            if (building) {
-                console.log('Building placed:', building);
-                // TODO: Add visual representation of the building
-            }
-            return;
-        }
 
         // Handle edge system clicks
         if (this.edgeUI.handleClick(worldPos)) {
@@ -373,7 +270,7 @@ class Game {
             this.mapSystem.updateDebugOverlay();
             
             // Send triangle data to server
-            this.socket.emit('updateMap', {
+            this.gameManager.socket.emit('updateMap', {
                 type: 'triangle',
                 data: {
                     q: worldPos.q,
@@ -429,14 +326,14 @@ class Game {
             ];
 
             // Send center point and corner points to server
-            this.socket.emit('updateMap', {
+            this.gameManager.socket.emit('updateMap', {
                 type: 'centerPoint',
                 data: centerPoint,
                 timestamp: Date.now()
             });
 
             cornerPoints.forEach(point => {
-                this.socket.emit('updateMap', {
+                this.gameManager.socket.emit('updateMap', {
                     type: 'cornerPoint',
                     data: point,
                     timestamp: Date.now()
