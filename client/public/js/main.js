@@ -5,9 +5,9 @@ import { getRandomGroundType } from '@shared/world/groundTypes.js';
 import { GROUND_TYPES } from '@shared/config/groundTypes.js';
 import { io } from 'socket.io-client';
 import BuildingSystem from './buildingSystem.js';
-import EdgeSystem from '@shared/world/EdgeSystem.js';
+import EdgeSystem from '@shared/world/edgeSystem.js';
 import EdgeUI from './edgeUI.js';
-import DebugUI from './debugUI.js';
+import { debugManager } from './modules/debug/debugManager.js';
 
 console.log('Initializing game...');
 
@@ -35,11 +35,22 @@ class Game {
         window.addEventListener('resize', () => this.resizeCanvas());
 
         // Initialize debug UI
-        this.debugUI = new DebugUI();
-        
-        // Initialize debug mode
         this.debugMode = false;
-        this.initDebugHandlers();
+        
+        // Handle debug mode toggle with shift key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Shift') {
+                this.debugMode = true;
+                debugManager.show();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key === 'Shift') {
+                this.debugMode = false;
+                debugManager.hide();
+            }
+        });
 
         // Initialize socket connection
         this.socket = io('http://localhost:3000', {
@@ -70,37 +81,20 @@ class Game {
         this.generateNewWorld();
     }
 
-    initDebugHandlers() {
-        // Handle debug mode toggle with shift key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Shift') {
-                this.debugMode = true;
-                this.debugUI.show();
-            }
-        });
-
-        document.addEventListener('keyup', (e) => {
-            if (e.key === 'Shift') {
-                this.debugMode = false;
-                this.debugUI.hide();
-            }
-        });
-    }
-
     setupSocketHandlers() {
         this.socket.on('connect', () => {
             console.log('[Client] Connected to server');
-            this.debugUI.updateServerStatus('Connected');
+            debugManager.updateServerStatus('Connected');
         });
 
         this.socket.on('disconnect', () => {
             console.log('[Client] Disconnected from server');
-            this.debugUI.updateServerStatus('Disconnected');
+            debugManager.updateServerStatus('Disconnected');
         });
 
         this.socket.on('error', (error) => {
             console.error('[Client] Socket error:', error);
-            this.debugUI.updateServerStatus('Error: ' + error.message);
+            debugManager.updateServerStatus('Error: ' + error.message);
         });
 
         // Handle initial world data
@@ -111,7 +105,7 @@ class Game {
                 this.mapSystem.clear();
                 
                 // Update world stats in debug UI
-                this.debugUI.updateWorldStats(data.mapData);
+                debugManager.updateWorldStats(data.mapData);
 
                 // Update center points
                 if (data.mapData.centerPoints) {
@@ -162,7 +156,7 @@ class Game {
 
             // Update FPS in debug UI if debug mode is active
             if (this.debugMode) {
-                this.debugUI.updateFPS(1000 / deltaTime);
+                debugManager.updateFPS(1000 / deltaTime);
             }
 
             // Update Stoonie positions and render
